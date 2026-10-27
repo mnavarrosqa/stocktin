@@ -133,7 +133,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** La app está a la vista (entre onStart y onStop). */
     @Volatile
-    var foreground = false
+    private var foreground = false
+
+    /** Al volver a la app se actualiza enseguida, sin esperar la próxima vuelta del ciclo. */
+    fun setForeground(visible: Boolean) {
+        foreground = visible
+        if (visible && System.currentTimeMillis() - lastAttempt > LIVE_REFRESH_MS) {
+            refresh(quiet = true)
+            if (_tab.value == Tab.MARKETS) refreshMarkets()
+        }
+    }
 
     private var lastAttempt = 0L
 

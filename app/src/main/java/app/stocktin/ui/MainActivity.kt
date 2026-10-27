@@ -80,12 +80,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        viewModel.foreground = true
+        viewModel.setForeground(true)
     }
 
     override fun onStop() {
         super.onStop()
-        viewModel.foreground = false
+        viewModel.setForeground(false)
     }
 
     private fun handleIntent(intent: Intent?) {
