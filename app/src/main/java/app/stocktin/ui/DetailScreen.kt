@@ -1,6 +1,9 @@
 package app.stocktin.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -85,11 +88,15 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
     val tabletop = fold?.isTabletop == true
 
     val background = if (inPane) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surface
+    // En el panel de la derecha, el panel ya deja lugar para la barra de estado.
+    val insets = if (inPane) WindowInsets(0) else ScaffoldDefaults.contentWindowInsets
     Scaffold(
         containerColor = background,
+        contentWindowInsets = insets,
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = background),
+                windowInsets = if (inPane) WindowInsets(0) else TopAppBarDefaults.windowInsets,
                 navigationIcon = {
                     IconButton(onClick = { viewModel.back() }) {
                         Icon(if (inPane) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack, if (inPane) "Cerrar" else "Volver")
@@ -164,7 +171,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                     .padding(padding)
                     .verticalScroll(rememberScrollState()),
             ) {
-                top(260.dp)
+                top(if (inPane) 320.dp else 260.dp)
                 Stats(quote)
                 News(viewModel, symbol)
                 Spacer(Modifier.height(24.dp))
@@ -304,35 +311,39 @@ private fun Stats(quote: Quote) {
         quote.volume?.takeIf { it > 0 }?.let { "Volumen" to Format.compact(it.toDouble()) },
         quote.marketCap?.takeIf { it > 0 }?.let { "Cap. de mercado" to Format.compact(it) },
     )
-    Column(Modifier.padding(horizontal = 16.dp)) {
-        if (quote.yearLow != null && quote.yearHigh != null && quote.yearHigh > quote.yearLow) {
-            YearRange(quote.price, quote.yearLow, quote.yearHigh)
-        }
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-        ) {
-            Column(Modifier.padding(vertical = 8.dp)) {
-                stats.chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        pair.forEach { (label, value) ->
-                            Column(Modifier.weight(1f)) {
-                                Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(value, style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.SemiBold)
+    BoxWithConstraints(Modifier.padding(horizontal = 16.dp)) {
+        // En paneles anchos (tablet) entran cuatro datos por fila.
+        val columns = if (maxWidth >= 560.dp) 4 else 2
+        Column {
+            if (quote.yearLow != null && quote.yearHigh != null && quote.yearHigh > quote.yearLow) {
+                YearRange(quote.price, quote.yearLow, quote.yearHigh)
+            }
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            ) {
+                Column(Modifier.padding(vertical = 8.dp)) {
+                    stats.chunked(columns).forEach { pair ->
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            pair.forEach { (label, value) ->
+                                Column(Modifier.weight(1f)) {
+                                    Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(value, style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.SemiBold)
+                                }
                             }
+                            repeat(columns - pair.size) { Spacer(Modifier.weight(1f)) }
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
+            Text(
+                "Última cotización: ${Format.time(quote.time * 1000)}. Datos de Yahoo Finance; algunas bolsas tienen demora.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
+            )
         }
-        Text(
-            "Última cotización: ${Format.time(quote.time * 1000)}. Datos de Yahoo Finance; algunas bolsas tienen demora.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
-        )
     }
 }
 

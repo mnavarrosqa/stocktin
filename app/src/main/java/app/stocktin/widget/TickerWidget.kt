@@ -152,7 +152,7 @@ class TickerWidget : GlanceAppWidget() {
             style = TextStyle(color = p.text, fontSize = if (size.width >= 170.dp) 26.sp else 20.sp, fontWeight = FontWeight.Bold),
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ChangeText(quote, p, pill, showValue, 13.sp, 72.dp)
+            ChangeText(quote, p, pill, showValue, 13.sp, 72.dp, alignEnd = false)
             val ext = quote.extChangePercent
             if (quote.extSession != null && ext != null && size.width >= 160.dp) {
                 Text("  ${quote.extSession.label} ", maxLines = 1, style = TextStyle(color = p.secondary, fontSize = 11.sp))

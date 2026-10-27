@@ -19,6 +19,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -103,7 +104,7 @@ fun FloatingTabBar(current: Tab, onSelect: (Tab) -> Unit, onSearch: () -> Unit, 
             color = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
             shadowElevation = 10.dp,
-            modifier = Modifier.size(60.dp),
+            modifier = Modifier.size(56.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.Search, contentDescription = "Buscar", modifier = Modifier.size(26.dp))
@@ -129,7 +130,7 @@ private fun TabPill(tab: Tab, selected: Boolean, onClick: () -> Unit) {
             .clip(CircleShape)
             .background(background)
             .selectable(selected = selected, onClick = onClick, role = Role.Tab)
-            .padding(horizontal = 18.dp)
+            .padding(horizontal = 16.dp)
             .animateContentSize(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -169,77 +170,83 @@ fun QuoteRow(
         label = "rowBackground",
     )
     val elevation by animateDpAsState(if (dragging) 8.dp else 0.dp, label = "rowElevation")
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 8.dp)
-            .shadow(elevation, RoundedCornerShape(16.dp))
-            .clip(RoundedCornerShape(16.dp))
-            .background(background)
-            .then(dragModifier)
-            .clickable(enabled = !editing, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
-            if (quote != null) {
-                Text(
-                    quote.name,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            } else {
-                Placeholder(Modifier.padding(top = 4.dp).width(110.dp).height(12.dp))
-            }
-        }
-        if (editing) {
-            IconButton(onClick = onRemove) { Icon(Icons.Filled.Delete, "Quitar", tint = MaterialTheme.colorScheme.error) }
-            Icon(
-                Icons.Filled.Menu,
-                contentDescription = "Arrastrar para mover",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = handleModifier.padding(12.dp),
-            )
-            return@Row
-        }
-        if (quote == null) {
-            // Mientras llega la primera cotización: la forma de la fila, sin números.
-            Placeholder(Modifier.width(60.dp).height(26.dp))
-            Spacer(Modifier.width(12.dp))
-            Placeholder(Modifier.width(150.dp).height(30.dp))
-            return@Row
-        }
-        Sparkline(
-            prices = quote.spark,
-            baseline = quote.previousClose,
-            color = changeColor(quote.change),
-            modifier = Modifier.width(60.dp).height(30.dp),
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                FlashingPrice(symbol, quote.price)
-                Spacer(Modifier.width(10.dp))
-                ChangePill(quote, showValue, onToggleValue)
-            }
-            val ext = quote.extChangePercent
-            if (quote.extSession != null && ext != null) {
-                Row(Modifier.padding(top = 3.dp)) {
+    // En paneles angostos (la mitad de un foldable) se saca el minigráfico para que entre el nombre.
+    BoxWithConstraints {
+        val compact = maxWidth < 380.dp
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 8.dp)
+                .shadow(elevation, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(background)
+                .then(dragModifier)
+                .clickable(enabled = !editing, onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                if (quote != null) {
                     Text(
-                        "${quote.extSession.label} ${quote.extPrice?.let(Format::price).orEmpty()}  ",
-                        style = MaterialTheme.typography.bodySmall.tabular(),
+                        quote.name,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
-                        Format.percent(ext),
-                        style = MaterialTheme.typography.bodySmall.tabular(),
-                        color = changeColor(ext),
-                        fontWeight = FontWeight.Medium,
-                    )
+                } else {
+                    Placeholder(Modifier.padding(top = 4.dp).width(110.dp).height(12.dp))
+                }
+            }
+            if (editing) {
+                IconButton(onClick = onRemove) { Icon(Icons.Filled.Delete, "Quitar", tint = MaterialTheme.colorScheme.error) }
+                Icon(
+                    Icons.Filled.Menu,
+                    contentDescription = "Arrastrar para mover",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = handleModifier.padding(12.dp),
+                )
+                return@Row
+            }
+            if (quote == null) {
+                // Mientras llega la primera cotización: la forma de la fila, sin números.
+                Placeholder(Modifier.width(60.dp).height(26.dp))
+                Spacer(Modifier.width(12.dp))
+                Placeholder(Modifier.width(150.dp).height(30.dp))
+                return@Row
+            }
+            if (!compact) {
+                Sparkline(
+                    prices = quote.spark,
+                    baseline = quote.previousClose,
+                    color = changeColor(quote.change),
+                    modifier = Modifier.width(60.dp).height(30.dp),
+                )
+                Spacer(Modifier.width(12.dp))
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FlashingPrice(symbol, quote.price)
+                    Spacer(Modifier.width(10.dp))
+                    ChangePill(quote, showValue, onToggleValue)
+                }
+                val ext = quote.extChangePercent
+                if (quote.extSession != null && ext != null) {
+                    Row(Modifier.padding(top = 3.dp)) {
+                        Text(
+                            "${quote.extSession.label} ${quote.extPrice?.let(Format::price).orEmpty()}  ",
+                            style = MaterialTheme.typography.bodySmall.tabular(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            Format.percent(ext),
+                            style = MaterialTheme.typography.bodySmall.tabular(),
+                            color = changeColor(ext),
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
                 }
             }
         }

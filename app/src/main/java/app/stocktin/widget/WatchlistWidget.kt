@@ -78,7 +78,10 @@ enum class WidgetLayout(val label: String) {
  * y cambio) hasta dos columnas con nombre, minigráfico y pre/post en pantallas anchas. También
  * puede mostrarse como mosaico de colores según cuánto subió o bajó cada símbolo.
  */
-class WatchlistWidget : GlanceAppWidget() {
+class WatchlistWidget(
+    /** Falso solo en las capturas: Robolectric no dibuja las listas con scroll de los widgets. */
+    private val scrollable: Boolean = true,
+) : GlanceAppWidget() {
 
     override val sizeMode = SizeMode.Exact
 
@@ -143,7 +146,9 @@ class WatchlistWidget : GlanceAppWidget() {
                 .background(p.background)
                 .padding(start = horizontalPadding, end = horizontalPadding, top = 10.dp, bottom = 4.dp),
         ) {
-            Header(title, status, market, compact = size.height < 150.dp || size.width < 200.dp, p)
+            val quotes = rows.mapNotNull { it.second }
+            val breadth = quotes.count { it.change > 0 } to quotes.count { it.change < 0 }
+            Header(title, status, market, breadth, compact = size.height < 150.dp || size.width < 200.dp, p)
             Spacer(GlanceModifier.height(4.dp))
             when {
                 rows.isEmpty() -> Box(
@@ -162,7 +167,14 @@ class WatchlistWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun Header(title: String, status: String, market: Pair<String, Boolean>?, compact: Boolean, p: WidgetPalette) {
+    private fun Header(
+        title: String,
+        status: String,
+        market: Pair<String, Boolean>?,
+        breadth: Pair<Int, Int>,
+        compact: Boolean,
+        p: WidgetPalette,
+    ) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             if (compact) {
                 // Una sola línea: título y hora, para dejar lugar a los símbolos.
@@ -185,6 +197,11 @@ class WatchlistWidget : GlanceAppWidget() {
                             Text("${market.first} · ", maxLines = 1, style = TextStyle(color = p.secondary, fontSize = 12.sp))
                         }
                         Text(status, maxLines = 1, style = TextStyle(color = p.secondary, fontSize = 12.sp))
+                        // Cuántos suben y cuántos bajan, como en la app.
+                        if (breadth.first + breadth.second > 0) {
+                            Text("   ▲${breadth.first}", maxLines = 1, style = TextStyle(color = p.up, fontSize = 12.sp, fontWeight = FontWeight.Bold))
+                            Text(" ▼${breadth.second}", maxLines = 1, style = TextStyle(color = p.down, fontSize = 12.sp, fontWeight = FontWeight.Bold))
+                        }
                     }
                 }
             }
@@ -206,23 +223,32 @@ class WatchlistWidget : GlanceAppWidget() {
     private fun QuoteList(rows: List<Pair<String, Quote?>>, width: Dp, options: RowOptions) {
         val columns = if (width >= 460.dp) 2 else 1
         val density = RowDensity.of(width / columns - if (columns > 1) 12.dp else 0.dp)
-        if (columns == 1) {
-            LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                items(rows, itemId = { it.first.hashCode().toLong() }) { (symbol, quote) ->
-                    Column(modifier = GlanceModifier.fillMaxWidth()) {
-                        QuoteRow(symbol, quote, density, options)
-                        Spacer(GlanceModifier.fillMaxWidth().height(1.dp).background(options.palette.divider))
+        Grid(rows, columns) { (symbol, quote) ->
+            Column(modifier = GlanceModifier.fillMaxWidth().padding(horizontal = if (columns > 1) 6.dp else 0.dp)) {
+                QuoteRow(symbol, quote, density, options)
+                Spacer(GlanceModifier.fillMaxWidth().height(1.dp).background(options.palette.divider))
+            }
+        }
+    }
+
+    /** Los símbolos en [columns] columnas, con scroll si no entran. */
+    @Composable
+    private fun Grid(rows: List<Pair<String, Quote?>>, columns: Int, item: @Composable (Pair<String, Quote?>) -> Unit) {
+        when {
+            !scrollable -> Column(modifier = GlanceModifier.fillMaxSize()) {
+                // Glance admite hasta 10 hijos por fila o columna.
+                rows.chunked(columns).take(10).forEach { line ->
+                    Row(modifier = GlanceModifier.fillMaxWidth()) {
+                        line.forEach { Box(modifier = GlanceModifier.defaultWeight()) { item(it) } }
+                        repeat(columns - line.size) { Spacer(GlanceModifier.defaultWeight()) }
                     }
                 }
             }
-        } else {
-            LazyVerticalGrid(gridCells = GridCells.Fixed(2), modifier = GlanceModifier.fillMaxSize()) {
-                items(rows, itemId = { it.first.hashCode().toLong() }) { (symbol, quote) ->
-                    Column(modifier = GlanceModifier.fillMaxWidth().padding(horizontal = 6.dp)) {
-                        QuoteRow(symbol, quote, density, options)
-                        Spacer(GlanceModifier.fillMaxWidth().height(1.dp).background(options.palette.divider))
-                    }
-                }
+            columns == 1 -> LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                items(rows, itemId = { it.first.hashCode().toLong() }) { item(it) }
+            }
+            else -> LazyVerticalGrid(gridCells = GridCells.Fixed(columns), modifier = GlanceModifier.fillMaxSize()) {
+                items(rows, itemId = { it.first.hashCode().toLong() }) { item(it) }
             }
         }
     }
@@ -349,11 +375,9 @@ class WatchlistWidget : GlanceAppWidget() {
         // Si entran todas, se estiran para llenar el widget; si no, se hace scroll.
         val available = height - 60.dp
         val tileHeight = (available / lines - 4.dp).coerceIn(52.dp, 96.dp)
-        LazyVerticalGrid(gridCells = GridCells.Fixed(columns), modifier = GlanceModifier.fillMaxSize()) {
-            items(rows, itemId = { it.first.hashCode().toLong() }) { (symbol, quote) ->
-                Box(modifier = GlanceModifier.padding(2.dp)) {
-                    Tile(symbol, quote, tileHeight, options)
-                }
+        Grid(rows, columns) { (symbol, quote) ->
+            Box(modifier = GlanceModifier.padding(2.dp)) {
+                Tile(symbol, quote, tileHeight, options)
             }
         }
     }
@@ -444,16 +468,25 @@ fun PriceText(quote: Quote, p: WidgetPalette, fontSize: TextUnit) {
 
 /** El cambio del día: texto de color o etiqueta de color. */
 @Composable
-fun ChangeText(quote: Quote, p: WidgetPalette, pill: Boolean, showValue: Boolean, fontSize: TextUnit, minWidth: Dp) {
+fun ChangeText(
+    quote: Quote,
+    p: WidgetPalette,
+    pill: Boolean,
+    showValue: Boolean,
+    fontSize: TextUnit,
+    minWidth: Dp,
+    /** Falso debajo de un precio alineado a la izquierda (widget de un símbolo). */
+    alignEnd: Boolean = true,
+) {
     val text = if (showValue) Format.change(quote.change) else Format.percent(quote.changePercent)
     if (pill) {
         Box(
             modifier = GlanceModifier
-                .width(minWidth)
+                .let { if (alignEnd) it.width(minWidth) else it }
                 .cornerRadius(8.dp)
                 .background(if (quote.isUp) p.upPill else p.downPill)
                 .padding(horizontal = 6.dp, vertical = 3.dp),
-            contentAlignment = Alignment.CenterEnd,
+            contentAlignment = if (alignEnd) Alignment.CenterEnd else Alignment.CenterStart,
         ) {
             Text(
                 text,
@@ -469,9 +502,9 @@ fun ChangeText(quote: Quote, p: WidgetPalette, pill: Boolean, showValue: Boolean
                 color = if (quote.isUp) p.up else p.down,
                 fontSize = fontSize,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.End,
+                textAlign = if (alignEnd) TextAlign.End else TextAlign.Start,
             ),
-            modifier = GlanceModifier.width(minWidth),
+            modifier = if (alignEnd) GlanceModifier.width(minWidth) else GlanceModifier,
         )
     }
 }

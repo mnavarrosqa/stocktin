@@ -72,7 +72,7 @@ class WidgetScreenshotTest {
     @Composable
     private fun ListWidget(theme: WidgetTheme, layout: WidgetLayout = WidgetLayout.LIST, pill: Boolean = false, count: Int = 8) {
         val list = rows.take(count)
-        WatchlistWidget().Content(
+        WatchlistWidget(scrollable = false).Content(
             title = "Mi lista",
             status = "14:22",
             market = WatchlistWidget.marketLabel(list.map { it.second }),
@@ -108,7 +108,9 @@ class WidgetScreenshotTest {
 
     @Test fun listGlass() = render("06_lista_transparente", 340.dp, 300.dp) { ListWidget(WidgetTheme.GLASS) }
 
-    @Test fun listWide() = render("07_lista_tablet", 560.dp, 300.dp) { ListWidget(WidgetTheme.DYNAMIC, count = 10) }
+    @Test
+    @Config(qualifiers = TABLET)
+    fun listWide() = render("07_lista_tablet", 560.dp, 300.dp) { ListWidget(WidgetTheme.DYNAMIC, count = 10) }
 
     @Test fun mosaic() = render("08_mosaico_4x3", 340.dp, 290.dp) { ListWidget(WidgetTheme.DYNAMIC, layout = WidgetLayout.MOSAIC, count = 10) }
 

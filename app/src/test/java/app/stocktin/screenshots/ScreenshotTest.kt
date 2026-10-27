@@ -17,6 +17,10 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import app.stocktin.data.YahooApi
 import app.stocktin.ui.MainActivity
 import com.github.takahirom.roborazzi.captureRoboImage
+import androidx.window.layout.FoldingFeature
+import androidx.window.testing.layout.FoldingFeature as fakeFoldingFeature
+import androidx.window.testing.layout.TestWindowLayoutInfo
+import androidx.window.testing.layout.WindowLayoutInfoPublisherRule
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -37,6 +41,10 @@ class ScreenshotTest {
 
     @get:Rule
     val compose = createEmptyComposeRule()
+
+    /** Para simular la bisagra de un foldable. */
+    @get:Rule
+    val windowLayout = WindowLayoutInfoPublisherRule()
 
     @Before
     fun setUp() {
@@ -125,8 +133,34 @@ class ScreenshotTest {
         settle()
         shot("08_desplegado")
     }
+
+    /** Foldable desplegado con la bisagra vertical en el medio (modo libro), como un Galaxy Z Fold. */
+    @Test
+    @Config(qualifiers = FOLD)
+    fun foldBook() {
+        ActivityScenario.launch(MainActivity::class.java).onActivity { activity ->
+            val hinge = fakeFoldingFeature(activity = activity, size = 20, state = FoldingFeature.State.FLAT, orientation = FoldingFeature.Orientation.VERTICAL)
+            windowLayout.overrideWindowLayoutInfo(TestWindowLayoutInfo(listOf(hinge)))
+        }
+        settle()
+        shot("09_fold_libro")
+        compose.onNodeWithText("NVDA").performClick()
+        settle()
+        shot("10_fold_libro_detalle")
+    }
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun tablet() {
+        launch()
+        compose.onNodeWithText("NVDA").performClick()
+        settle()
+        shot("11_tablet")
+    }
 }
 
+const val FOLD = "w690dp-h800dp-xhdpi"
+const val TABLET = "w1280dp-h800dp-land-mdpi"
 private const val PHONE_SIZE = "w411dp-h914dp"
 const val PHONE = "$PHONE_SIZE-xxhdpi"
 const val UNFOLDED = "w841dp-h701dp-land-xhdpi"

@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -188,65 +189,78 @@ private fun PhoneLayout(viewModel: MainViewModel, tab: Tab, top: Screen?, onUpda
 }
 
 /**
- * Pantalla ancha (foldable desplegado o tablet): barra lateral, la lista a la izquierda y el
- * detalle a la derecha. En un foldable en modo libro, los paneles se separan justo en la bisagra.
+ * Pantalla ancha (foldable desplegado o tablet): la lista a la izquierda y el detalle a la derecha.
+ * En un foldable en modo libro los paneles se separan justo en la bisagra. Con ancho mediano
+ * (un foldable desplegado) las pestañas van en la barra flotante abajo de la lista, para no
+ * quitarle lugar; recién en tablets grandes pasan a una barra lateral.
  */
 @Composable
 private fun WideLayout(viewModel: MainViewModel, tab: Tab, detail: Screen.Detail?, onUpdate: () -> Unit) {
     val fold = rememberFoldingFeature()
-    val railWidth = 80.dp
-    Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        NavigationRail(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            modifier = Modifier.fillMaxHeight().width(railWidth),
-            header = {
-                FloatingActionButton(onClick = { viewModel.open(Screen.Search) }, modifier = Modifier.padding(top = 8.dp)) {
-                    Icon(Icons.Filled.Search, "Buscar")
-                }
-            },
-        ) {
-            Spacer(Modifier.weight(1f))
-            Tab.entries.forEach { item ->
-                NavigationRailItem(
-                    selected = tab == item,
-                    onClick = { viewModel.selectTab(item) },
-                    icon = { TabIcon(item, contentDescription = null) },
-                    label = { Text(item.label) },
-                )
-            }
-            Spacer(Modifier.weight(1f))
+    val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+        val expanded = maxWidth >= 840.dp
+        val railWidth = if (expanded) 80.dp else 0.dp
+        val hinge = fold?.takeIf { it.isBook }?.hingeDp()
+        val content = maxWidth - railWidth
+        val listWidth = when {
+            tab == Tab.SETTINGS -> content
+            hinge != null -> (hinge.first - railWidth).coerceAtMost(content - 280.dp).coerceAtLeast(280.dp)
+            expanded -> (content * 0.4f).coerceIn(360.dp, 480.dp)
+            else -> content * 0.5f
         }
-        if (tab == Tab.SETTINGS) {
-            Box(Modifier.weight(1f)) { SettingsScreen(viewModel, onUpdate, bottomPadding = 0.dp) }
-            return@Row
-        }
-        BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
-            val hinge = fold?.takeIf { it.isBook }?.hingeDp()
-            val listWidth = if (hinge != null) {
-                (hinge.first - railWidth).coerceAtMost(maxWidth - 240.dp).coerceAtLeast(240.dp)
-            } else {
-                (maxWidth * 0.42f).coerceIn(320.dp, 480.dp)
-            }
-            val gap = if (hinge != null) hinge.second - hinge.first else 0.dp
-            Row(Modifier.fillMaxSize()) {
-                Box(Modifier.width(listWidth).fillMaxHeight()) {
-                    TabContent(viewModel, tab, detail?.symbol, bottomPadding = 0.dp, onUpdate = onUpdate)
-                }
-                Spacer(Modifier.width(gap))
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                ) {
-                    AnimatedContent(targetState = detail?.symbol, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "pane") { symbol ->
-                        if (symbol != null) {
-                            DetailScreen(viewModel, symbol, inPane = true)
-                        } else {
-                            EmptyPane()
+        val gap = if (hinge != null && tab != Tab.SETTINGS) hinge.second - hinge.first else 0.dp
+        val bottomPadding = if (expanded) 0.dp else 96.dp + navBar
+        Row(Modifier.fillMaxSize()) {
+            if (expanded) {
+                NavigationRail(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    modifier = Modifier.fillMaxHeight().width(railWidth),
+                    header = {
+                        FloatingActionButton(onClick = { viewModel.open(Screen.Search) }, modifier = Modifier.padding(top = 8.dp)) {
+                            Icon(Icons.Filled.Search, "Buscar")
                         }
+                    },
+                ) {
+                    Spacer(Modifier.weight(1f))
+                    Tab.entries.forEach { item ->
+                        NavigationRailItem(
+                            selected = tab == item,
+                            onClick = { viewModel.selectTab(item) },
+                            icon = { TabIcon(item, contentDescription = null) },
+                            label = { Text(item.label) },
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+            Box(Modifier.width(listWidth).fillMaxHeight()) {
+                TabContent(viewModel, tab, detail?.symbol, bottomPadding = bottomPadding, onUpdate = onUpdate)
+                if (!expanded) {
+                    FloatingTabBar(
+                        current = tab,
+                        onSelect = viewModel::selectTab,
+                        onSearch = { viewModel.open(Screen.Search) },
+                        modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 12.dp),
+                    )
+                }
+            }
+            if (tab == Tab.SETTINGS) return@Row
+            Spacer(Modifier.width(gap))
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .statusBarsPadding()
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
+            ) {
+                AnimatedContent(targetState = detail?.symbol, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "pane") { symbol ->
+                    if (symbol != null) {
+                        DetailScreen(viewModel, symbol, inPane = true)
+                    } else {
+                        EmptyPane()
                     }
                 }
             }
