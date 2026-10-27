@@ -84,11 +84,12 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
     val fold = rememberFoldingFeature()
     val tabletop = fold?.isTabletop == true
 
+    val background = if (inPane) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surface
     Scaffold(
-        containerColor = if (inPane) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surface,
+        containerColor = background,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = background),
                 navigationIcon = {
                     IconButton(onClick = { viewModel.back() }) {
                         Icon(if (inPane) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack, if (inPane) "Cerrar" else "Volver")
@@ -300,8 +301,6 @@ private fun Stats(quote: Quote) {
         quote.previousClose?.let { "Cierre anterior" to Format.price(it) },
         quote.dayHigh?.let { "Máximo del día" to Format.price(it) },
         quote.dayLow?.let { "Mínimo del día" to Format.price(it) },
-        quote.yearHigh?.let { "Máximo 52 sem." to Format.price(it) },
-        quote.yearLow?.let { "Mínimo 52 sem." to Format.price(it) },
         quote.volume?.takeIf { it > 0 }?.let { "Volumen" to Format.compact(it.toDouble()) },
         quote.marketCap?.takeIf { it > 0 }?.let { "Cap. de mercado" to Format.compact(it) },
     )

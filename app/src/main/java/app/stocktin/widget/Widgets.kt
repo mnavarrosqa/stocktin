@@ -27,16 +27,20 @@ import java.util.concurrent.TimeUnit
 object Widgets {
 
     suspend fun updateAll(context: Context) {
-        WatchlistWidget().updateAll(context)
-        TickerWidget().updateAll(context)
+        runCatching {
+            WatchlistWidget().updateAll(context)
+            TickerWidget().updateAll(context)
+        }
     }
 
     /** Los símbolos de todas las listas más los de los widgets de un símbolo. */
     suspend fun symbolsInUse(context: Context): List<String> {
-        val manager = GlanceAppWidgetManager(context)
-        val tickers = manager.getGlanceIds(TickerWidget::class.java).mapNotNull { id ->
-            getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[WidgetKeys.SYMBOL]
-        }
+        // Si no se pueden leer los widgets, igual se actualizan las listas.
+        val tickers = runCatching {
+            GlanceAppWidgetManager(context).getGlanceIds(TickerWidget::class.java).mapNotNull { id ->
+                getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[WidgetKeys.SYMBOL]
+            }
+        }.getOrDefault(emptyList())
         return (Repository.get(context).allSymbols() + tickers).distinct()
     }
 

@@ -97,4 +97,37 @@ class YahooParserTest {
         assertEquals(listOf("AAPL", "BTC-USD"), results.map { it.symbol })
         assertEquals("Bitcoin USD", results[1].name)
     }
+
+    @Test
+    fun `noticias con la miniatura mas chica que sirva`() {
+        val json = """
+            {"news":[
+              {"title":"NVDA sube","publisher":"Reuters","link":"https://x/1","providerPublishTime":1761590000,
+               "thumbnail":{"resolutions":[{"url":"https://x/big.jpg","width":1200},{"url":"https://x/small.jpg","width":140},{"url":"https://x/tiny.jpg","width":60}]}},
+              {"title":"Sin link"},
+              {"title":"Sin foto","publisher":"Bloomberg","link":"https://x/2"}
+            ]}
+        """.trimIndent()
+        val news = YahooParser.parseNews(json)
+        assertEquals(listOf("NVDA sube", "Sin foto"), news.map { it.title })
+        assertEquals("https://x/small.jpg", news[0].thumbnail)
+        assertNull(news[1].thumbnail)
+    }
+
+    @Test
+    fun `lo mas buscado`() {
+        val json = """{"finance":{"result":[{"count":2,"quotes":[{"symbol":"NVDA"},{"symbol":"TSLA"}]}],"error":null}}"""
+        assertEquals(listOf("NVDA", "TSLA"), YahooParser.parseTrending(json))
+    }
+
+    @Test
+    fun `ordenar la lista`() {
+        fun q(symbol: String, pct: Double) = Quote(symbol, symbol, 1.0, pct, pct, null, null, null)
+        val quotes = mapOf("A" to q("A", 1.0), "B" to q("B", -2.0), "^C" to q("^C", 3.0))
+        val symbols = listOf("B", "^C", "A", "D")
+        assertEquals(symbols, SortMode.CUSTOM.apply(symbols, quotes))
+        assertEquals(listOf("^C", "A", "B", "D"), SortMode.GAINERS.apply(symbols, quotes))
+        assertEquals(listOf("B", "A", "^C", "D"), SortMode.LOSERS.apply(symbols, quotes))
+        assertEquals(listOf("A", "B", "^C", "D"), SortMode.NAME.apply(symbols, quotes))
+    }
 }
