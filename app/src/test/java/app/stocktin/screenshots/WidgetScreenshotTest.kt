@@ -107,7 +107,7 @@ class WidgetScreenshotTest {
             val pad = (20 * density).toInt()
             setPadding(pad, pad, pad, pad)
         }
-        val icon = activity.packageManager.getApplicationIcon(activity.packageName)
+        val icon = activity.getDrawable(app.stocktin.R.mipmap.ic_launcher)
         listOf(96, 64, 48).forEach { dp ->
             val view = android.widget.ImageView(activity).apply { setImageDrawable(icon) }
             val px = (dp * density).toInt()
