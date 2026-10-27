@@ -58,6 +58,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.stocktin.R
@@ -283,7 +284,10 @@ private fun FlashingPrice(symbol: String, price: Double) {
         Format.price(price),
         style = MaterialTheme.typography.titleMedium.tabular(),
         fontWeight = FontWeight.SemiBold,
+        // Ancho mínimo fijo: así los minigráficos quedan alineados en columna.
+        textAlign = TextAlign.End,
         modifier = Modifier
+            .widthIn(min = 96.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(flash.value)
             .padding(horizontal = 4.dp, vertical = 1.dp),

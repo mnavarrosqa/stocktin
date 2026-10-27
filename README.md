@@ -54,6 +54,12 @@ búsqueda al lado.
 - **Detalle** con gráfico de 1D, 5D, 1M, 6M, YTD, 1A, 5A y Máx: deslizá el dedo sobre el gráfico
   para ver el precio de cada momento (con vibración suave). Debajo, dónde está el precio en el
   rango de 52 semanas, apertura, máximo y mínimo, volumen y capitalización.
+- Arriba de las listas, una tira con S&P 500, Nasdaq, Dow y Bitcoin; debajo, cuántos símbolos
+  suben y cuántos bajan, con una barra de amplitud.
+- **Ordenar** por mayor suba, mayor baja o símbolo, y **deslizar una fila** para quitarla (con
+  Deshacer). Los precios destellan en verde o rojo cuando cambian.
+- La búsqueda muestra tus búsquedas recientes y lo más buscado del día en Yahoo Finance.
+- El detalle trae las últimas **noticias** del símbolo y marca el máximo y el mínimo en el gráfico.
 - Con la app abierta los precios se actualizan cada 30 segundos.
 - Tocá la etiqueta de color para alternar entre porcentaje y dinero.
 
@@ -77,6 +83,13 @@ Todas las versiones se firman con la misma clave para que se instalen encima. La
 el repo: va en los secrets de GitHub Actions `STOCKTIN_KEYSTORE_BASE64` (el `.p12` en base64) y
 `STOCKTIN_KEYSTORE_PASSWORD`. Sin ellos, `main` no publica nada (las demás ramas compilan con la
 clave de debug).
+
+## Capturas de pantalla
+
+Cada push a una rama que no sea `main` genera capturas de la app con datos armados (Robolectric +
+Roborazzi, `ScreenshotTest`) y las deja en la rama
+[`screenshots`](https://github.com/mnavarrosqa/stocktin/tree/screenshots/app/screenshots):
+listas, mercados, detalle, búsqueda, ajustes, modo oscuro y foldable desplegado.
 
 ## Tests
 
