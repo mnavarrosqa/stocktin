@@ -13,6 +13,8 @@ object WidgetKeys {
     /** Símbolo del widget de un solo símbolo. */
     val SYMBOL = stringPreferencesKey("symbol")
     val THEME = stringPreferencesKey("theme")
+    /** Lista o mosaico ([WidgetLayout]). */
+    val LAYOUT = stringPreferencesKey("layout")
     val SHOW_SPARK = booleanPreferencesKey("show_spark")
     val SHOW_NAME = booleanPreferencesKey("show_name")
     /** Cambio dentro de una etiqueta de color (como en la app de Bolsa de iPhone). */

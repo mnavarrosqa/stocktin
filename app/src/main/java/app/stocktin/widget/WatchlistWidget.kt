@@ -1,13 +1,17 @@
 package app.stocktin.widget
 
 import android.content.Context
+import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
 import androidx.glance.ColorFilter
@@ -17,6 +21,7 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
+import androidx.glance.action.Action
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
@@ -26,7 +31,9 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
+import androidx.glance.appwidget.lazy.GridCells
 import androidx.glance.appwidget.lazy.LazyColumn
+import androidx.glance.appwidget.lazy.LazyVerticalGrid
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
@@ -46,13 +53,30 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
 import app.stocktin.R
 import app.stocktin.data.Format
 import app.stocktin.data.Quote
 import app.stocktin.data.Repository
 import app.stocktin.ui.MainActivity
+import kotlin.math.abs
+import kotlin.math.ceil
 
-/** Widget con una lista de seguimiento: precio, cambio, minigráfico y pre/post de cada símbolo. */
+/** Cómo se muestran los símbolos en el widget de lista. */
+enum class WidgetLayout(val label: String) {
+    LIST("Lista"),
+    MOSAIC("Mosaico");
+
+    companion object {
+        fun from(key: String?) = entries.firstOrNull { it.name == key } ?: LIST
+    }
+}
+
+/**
+ * Widget con una lista de seguimiento. Se adapta al tamaño: de una columna con lo justo (símbolo
+ * y cambio) hasta dos columnas con nombre, minigráfico y pre/post en pantallas anchas. También
+ * puede mostrarse como mosaico de colores según cuánto subió o bajó cada símbolo.
+ */
 class WatchlistWidget : GlanceAppWidget() {
 
     override val sizeMode = SizeMode.Exact
@@ -80,9 +104,16 @@ class WatchlistWidget : GlanceAppWidget() {
                 refreshing -> "Actualizando…"
                 lastRefresh == 0L -> "Tocá ↻ para actualizar"
                 error != null -> "Sin conexión · ${Format.time(lastRefresh)}"
-                else -> "Actualizado ${Format.time(lastRefresh)}"
+                else -> Format.time(lastRefresh)
             }
-            Content(list?.name ?: "Stocktin", status, marketLabel(rows.mapNotNull { it.second }), rows, options)
+            Content(
+                title = list?.name ?: "Stocktin",
+                status = status,
+                market = marketLabel(rows.mapNotNull { it.second }),
+                rows = rows,
+                layout = WidgetLayout.from(prefs[WidgetKeys.LAYOUT]),
+                options = options,
+            )
         }
     }
 
@@ -92,29 +123,24 @@ class WatchlistWidget : GlanceAppWidget() {
         status: String,
         market: Pair<String, Boolean>?,
         rows: List<Pair<String, Quote?>>,
+        layout: WidgetLayout,
         options: RowOptions,
     ) {
         val size = LocalSize.current
         val p = options.palette
-        // En widgets angostos se achica todo y se saca lo que no entra.
-        val compact = size.width < 230.dp
-        val sparkWidth = when {
-            !options.showSpark || size.width < 290.dp -> 0.dp
-            size.width < 360.dp -> 52.dp
-            else -> 68.dp
-        }
+        val horizontalPadding = if (size.width < 200.dp) 10.dp else 14.dp
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .appWidgetBackground()
-                .cornerRadius(24.dp)
+                .widgetCorners()
                 .background(p.background)
-                .padding(horizontal = if (compact) 10.dp else 14.dp, vertical = 10.dp),
+                .padding(start = horizontalPadding, end = horizontalPadding, top = 10.dp, bottom = 4.dp),
         ) {
-            Header(title, status, market, compact, p)
-            Spacer(GlanceModifier.height(6.dp))
-            if (rows.isEmpty()) {
-                Box(
+            Header(title, status, market, compact = size.height < 150.dp || size.width < 200.dp, p)
+            Spacer(GlanceModifier.height(4.dp))
+            when {
+                rows.isEmpty() -> Box(
                     modifier = GlanceModifier.fillMaxSize().clickable(actionStartActivity<MainActivity>()),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -123,15 +149,8 @@ class WatchlistWidget : GlanceAppWidget() {
                         style = TextStyle(color = p.secondary, fontSize = 13.sp, textAlign = TextAlign.Center),
                     )
                 }
-            } else {
-                LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                    items(rows, itemId = { it.first.hashCode().toLong() }) { (symbol, quote) ->
-                        Column(modifier = GlanceModifier.fillMaxWidth()) {
-                            QuoteRow(symbol, quote, compact, sparkWidth, options)
-                            Spacer(GlanceModifier.fillMaxWidth().height(1.dp).background(p.divider))
-                        }
-                    }
-                }
+                layout == WidgetLayout.MOSAIC -> Mosaic(rows, size.width - horizontalPadding * 2, size.height, options)
+                else -> QuoteList(rows, size.width - horizontalPadding * 2, options)
             }
         }
     }
@@ -139,29 +158,36 @@ class WatchlistWidget : GlanceAppWidget() {
     @Composable
     private fun Header(title: String, status: String, market: Pair<String, Boolean>?, compact: Boolean, p: WidgetPalette) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity<MainActivity>())) {
-                Text(
-                    title,
-                    maxLines = 1,
-                    style = TextStyle(color = p.text, fontSize = if (compact) 15.sp else 17.sp, fontWeight = FontWeight.Bold),
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (market != null && !compact) {
-                        Text(
-                            "● ",
-                            style = TextStyle(color = if (market.second) p.up else p.secondary, fontSize = 10.sp),
-                        )
-                        Text("${market.first} · ", maxLines = 1, style = TextStyle(color = p.secondary, fontSize = 12.sp))
+            if (compact) {
+                // Una sola línea: título y hora, para dejar lugar a los símbolos.
+                Row(
+                    modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity<MainActivity>()),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (market != null) {
+                        Text("● ", style = TextStyle(color = if (market.second) p.up else p.secondary, fontSize = 9.sp))
                     }
-                    Text(status, maxLines = 1, style = TextStyle(color = p.secondary, fontSize = 12.sp))
+                    Text(title, maxLines = 1, style = TextStyle(color = p.text, fontSize = 14.sp, fontWeight = FontWeight.Bold))
+                    Text("  $status", maxLines = 1, style = TextStyle(color = p.secondary, fontSize = 11.sp))
+                }
+            } else {
+                Column(modifier = GlanceModifier.defaultWeight().clickable(actionStartActivity<MainActivity>())) {
+                    Text(title, maxLines = 1, style = TextStyle(color = p.text, fontSize = 17.sp, fontWeight = FontWeight.Bold))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (market != null) {
+                            Text("● ", style = TextStyle(color = if (market.second) p.up else p.secondary, fontSize = 10.sp))
+                            Text("${market.first} · ", maxLines = 1, style = TextStyle(color = p.secondary, fontSize = 12.sp))
+                        }
+                        Text(status, maxLines = 1, style = TextStyle(color = p.secondary, fontSize = 12.sp))
+                    }
                 }
             }
             Image(
                 provider = ImageProvider(R.drawable.ic_refresh),
                 contentDescription = "Actualizar",
-                colorFilter = ColorFilter.tint(p.text),
+                colorFilter = ColorFilter.tint(p.secondary),
                 modifier = GlanceModifier
-                    .size(36.dp)
+                    .size(if (compact) 30.dp else 36.dp)
                     .padding(6.dp)
                     .cornerRadius(18.dp)
                     .clickable(actionRunCallback<RefreshAction>()),
@@ -169,62 +195,191 @@ class WatchlistWidget : GlanceAppWidget() {
         }
     }
 
+    /** Lista de una columna, o de dos si el widget es muy ancho (tablet o foldable desplegado). */
     @Composable
-    private fun QuoteRow(symbol: String, quote: Quote?, compact: Boolean, sparkWidth: Dp, options: RowOptions) {
+    private fun QuoteList(rows: List<Pair<String, Quote?>>, width: Dp, options: RowOptions) {
+        val columns = if (width >= 460.dp) 2 else 1
+        val density = RowDensity.of(width / columns - if (columns > 1) 12.dp else 0.dp)
+        if (columns == 1) {
+            LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                items(rows, itemId = { it.first.hashCode().toLong() }) { (symbol, quote) ->
+                    Column(modifier = GlanceModifier.fillMaxWidth()) {
+                        QuoteRow(symbol, quote, density, options)
+                        Spacer(GlanceModifier.fillMaxWidth().height(1.dp).background(options.palette.divider))
+                    }
+                }
+            }
+        } else {
+            LazyVerticalGrid(gridCells = GridCells.Fixed(2), modifier = GlanceModifier.fillMaxSize()) {
+                items(rows, itemId = { it.first.hashCode().toLong() }) { (symbol, quote) ->
+                    Column(modifier = GlanceModifier.fillMaxWidth().padding(horizontal = 6.dp)) {
+                        QuoteRow(symbol, quote, density, options)
+                        Spacer(GlanceModifier.fillMaxWidth().height(1.dp).background(options.palette.divider))
+                    }
+                }
+            }
+        }
+    }
+
+    /** Cuánto entra en cada fila según su ancho. */
+    private enum class RowDensity {
+        /** Símbolo arriba, precio y cambio abajo. */
+        TINY,
+        /** Símbolo a la izquierda; precio y cambio apilados a la derecha. */
+        NARROW,
+        /** Precio y cambio en la misma línea. */
+        MEDIUM,
+        /** Además, minigráfico. */
+        WIDE,
+        /** Minigráfico más grande. */
+        XWIDE;
+
+        companion object {
+            fun of(rowWidth: Dp) = when {
+                rowWidth < 150.dp -> TINY
+                rowWidth < 230.dp -> NARROW
+                rowWidth < 290.dp -> MEDIUM
+                rowWidth < 360.dp -> WIDE
+                else -> XWIDE
+            }
+        }
+    }
+
+    @Composable
+    private fun QuoteRow(symbol: String, quote: Quote?, density: RowDensity, options: RowOptions) {
         val p = options.palette
-        val open = actionStartActivity<MainActivity>(
-            actionParametersOf(ActionParameters.Key<String>(MainActivity.EXTRA_SYMBOL) to symbol),
-        )
+        val open = openSymbol(symbol)
+        if (density == RowDensity.TINY) {
+            Column(modifier = GlanceModifier.fillMaxWidth().padding(vertical = 6.dp).clickable(open)) {
+                Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        symbol,
+                        maxLines = 1,
+                        style = TextStyle(color = p.text, fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                        modifier = GlanceModifier.defaultWeight(),
+                    )
+                    if (quote != null) {
+                        Text(
+                            Format.percent(quote.changePercent),
+                            maxLines = 1,
+                            style = TextStyle(color = if (quote.isUp) p.up else p.down, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                        )
+                    }
+                }
+                if (quote != null) {
+                    Text(Format.price(quote.price), maxLines = 1, style = TextStyle(color = p.secondary, fontSize = 12.sp))
+                }
+            }
+            return
+        }
+        val big = density >= RowDensity.MEDIUM
         Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(vertical = if (compact) 6.dp else 8.dp).clickable(open),
+            modifier = GlanceModifier.fillMaxWidth().padding(vertical = if (big) 8.dp else 6.dp).clickable(open),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(
                     symbol,
                     maxLines = 1,
-                    style = TextStyle(color = p.text, fontSize = if (compact) 14.sp else 16.sp, fontWeight = FontWeight.Bold),
+                    style = TextStyle(color = p.text, fontSize = if (big) 16.sp else 14.sp, fontWeight = FontWeight.Bold),
                 )
                 if (options.showName && quote != null) {
-                    Text(quote.name, maxLines = 1, style = TextStyle(color = p.secondary, fontSize = if (compact) 11.sp else 13.sp))
+                    Text(quote.name, maxLines = 1, style = TextStyle(color = p.secondary, fontSize = if (big) 12.sp else 11.sp))
                 }
             }
-            if (sparkWidth > 0.dp && quote != null) {
-                SparkImage(quote, sparkWidth, 28.dp)
+            val sparkWidth = when (density) {
+                RowDensity.WIDE -> 52.dp
+                RowDensity.XWIDE -> 68.dp
+                else -> 0.dp
+            }
+            if (options.showSpark && sparkWidth > 0.dp && quote != null) {
+                SparkImage(quote, sparkWidth, 26.dp)
                 Spacer(GlanceModifier.width(10.dp))
             }
+            if (quote == null) {
+                Text("—", style = TextStyle(color = p.secondary, fontSize = 15.sp))
+                return@Row
+            }
             Column(horizontalAlignment = Alignment.End) {
-                if (quote == null) {
-                    Text("—", style = TextStyle(color = p.secondary, fontSize = 15.sp))
-                    return@Column
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        Format.price(quote.price),
-                        maxLines = 1,
-                        style = TextStyle(color = p.text, fontSize = if (compact) 14.sp else 16.sp, fontWeight = FontWeight.Bold),
-                    )
-                    Spacer(GlanceModifier.width(8.dp))
-                    Change(quote, options, if (compact) 12.sp else 14.sp, if (compact) 62.dp else 76.dp)
+                if (big) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        PriceText(quote, p, 16.sp)
+                        Spacer(GlanceModifier.width(8.dp))
+                        ChangeText(quote, p, options.pill, options.showValue, 14.sp, 76.dp)
+                    }
+                } else {
+                    PriceText(quote, p, 14.sp)
+                    ChangeText(quote, p, options.pill, options.showValue, 12.sp, 64.dp)
                 }
                 val ext = quote.extChangePercent
-                if (options.showExt && quote.extSession != null && ext != null) {
+                if (options.showExt && big && quote.extSession != null && ext != null) {
                     Row {
                         Text(
                             "${quote.extSession.label} ${quote.extPrice?.let(Format::price).orEmpty()}  ",
                             maxLines = 1,
-                            style = TextStyle(color = p.secondary, fontSize = if (compact) 11.sp else 12.sp),
+                            style = TextStyle(color = p.secondary, fontSize = 11.sp),
                         )
                         Text(
                             Format.percent(ext),
                             maxLines = 1,
-                            style = TextStyle(
-                                color = if (ext >= 0) p.up else p.down,
-                                fontSize = if (compact) 11.sp else 12.sp,
-                                fontWeight = FontWeight.Medium,
-                            ),
+                            style = TextStyle(color = if (ext >= 0) p.up else p.down, fontSize = 11.sp, fontWeight = FontWeight.Medium),
                         )
                     }
+                }
+            }
+        }
+    }
+
+    /** Mosaico: una baldosa por símbolo, más intensa cuanto más se movió (como un mapa de calor). */
+    @Composable
+    private fun Mosaic(rows: List<Pair<String, Quote?>>, width: Dp, height: Dp, options: RowOptions) {
+        val columns = when {
+            width < 170.dp -> 2
+            width < 260.dp -> 3
+            width < 360.dp -> 4
+            else -> 5
+        }
+        val lines = ceil(rows.size / columns.toDouble()).toInt().coerceAtLeast(1)
+        // Si entran todas, se estiran para llenar el widget; si no, se hace scroll.
+        val available = height - 60.dp
+        val tileHeight = (available / lines - 4.dp).coerceIn(52.dp, 96.dp)
+        LazyVerticalGrid(gridCells = GridCells.Fixed(columns), modifier = GlanceModifier.fillMaxSize()) {
+            items(rows, itemId = { it.first.hashCode().toLong() }) { (symbol, quote) ->
+                Box(modifier = GlanceModifier.padding(2.dp)) {
+                    Tile(symbol, quote, tileHeight, options)
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun Tile(symbol: String, quote: Quote?, height: Dp, options: RowOptions) {
+        val white = ColorProvider(Color.White)
+        val faded = ColorProvider(Color.White.copy(alpha = 0.85f))
+        Column(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height(height)
+                .cornerRadius(12.dp)
+                .background(ColorProvider(heatColor(quote?.changePercent)))
+                .padding(horizontal = 6.dp, vertical = 4.dp)
+                .clickable(openSymbol(symbol)),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                symbol,
+                maxLines = 1,
+                style = TextStyle(color = white, fontSize = 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
+            )
+            if (quote != null) {
+                Text(
+                    if (options.showValue) Format.change(quote.change) else Format.percent(quote.changePercent),
+                    maxLines = 1,
+                    style = TextStyle(color = white, fontSize = if (height >= 64.dp) 16.sp else 14.sp, fontWeight = FontWeight.Bold),
+                )
+                if (height >= 64.dp) {
+                    Text(Format.price(quote.price), maxLines = 1, style = TextStyle(color = faded, fontSize = 11.sp))
                 }
             }
         }
@@ -239,10 +394,6 @@ class WatchlistWidget : GlanceAppWidget() {
         val showValue: Boolean,
     )
 
-    @Composable
-    private fun Change(quote: Quote, options: RowOptions, fontSize: TextUnit, pillWidth: Dp) =
-        ChangeText(quote, options.palette, options.pill, options.showValue, fontSize, pillWidth)
-
     companion object {
         /** Estado del mercado de la lista (el del primer símbolo que no sea cripto). */
         fun marketLabel(quotes: List<Quote>): Pair<String, Boolean>? {
@@ -250,18 +401,50 @@ class WatchlistWidget : GlanceAppWidget() {
             val label = Format.marketState(quote.marketState).takeIf { it.isNotEmpty() } ?: return null
             return label to (quote.marketState == "REGULAR")
         }
+
+        private val NEUTRAL = Color(0xFF59606B)
+        private val UP = Color(0xFF15803D)
+        private val DOWN = Color(0xFFC0262D)
+
+        /** Gris si casi no se movió; verde o rojo pleno a partir de ±3 %. */
+        fun heatColor(percent: Double?): Color {
+            if (percent == null) return NEUTRAL
+            val strength = (abs(percent) / 3.0).coerceIn(0.0, 1.0).toFloat()
+            return lerp(NEUTRAL, if (percent >= 0) UP else DOWN, 0.25f + 0.75f * strength)
+        }
     }
+}
+
+/** Abre el detalle de [symbol] en la app. */
+fun openSymbol(symbol: String): Action =
+    actionStartActivity<MainActivity>(actionParametersOf(ActionParameters.Key<String>(MainActivity.EXTRA_SYMBOL) to symbol))
+
+/** Las esquinas del launcher (Android 12+), o 24 dp. */
+fun GlanceModifier.widgetCorners(): GlanceModifier =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        cornerRadius(android.R.dimen.system_app_widget_background_radius)
+    } else {
+        cornerRadius(24.dp)
+    }
+
+@Composable
+fun PriceText(quote: Quote, p: WidgetPalette, fontSize: TextUnit) {
+    Text(
+        Format.price(quote.price),
+        maxLines = 1,
+        style = TextStyle(color = p.text, fontSize = fontSize, fontWeight = FontWeight.Bold),
+    )
 }
 
 /** El cambio del día: texto de color o etiqueta de color. */
 @Composable
-fun ChangeText(quote: Quote, p: WidgetPalette, pill: Boolean, showValue: Boolean, fontSize: TextUnit, pillWidth: Dp) {
+fun ChangeText(quote: Quote, p: WidgetPalette, pill: Boolean, showValue: Boolean, fontSize: TextUnit, minWidth: Dp) {
     val text = if (showValue) Format.change(quote.change) else Format.percent(quote.changePercent)
     if (pill) {
         Box(
             modifier = GlanceModifier
-                .width(pillWidth)
-                .cornerRadius(6.dp)
+                .width(minWidth)
+                .cornerRadius(8.dp)
                 .background(if (quote.isUp) p.upPill else p.downPill)
                 .padding(horizontal = 6.dp, vertical = 3.dp),
             contentAlignment = Alignment.CenterEnd,
@@ -282,7 +465,7 @@ fun ChangeText(quote: Quote, p: WidgetPalette, pill: Boolean, showValue: Boolean
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.End,
             ),
-            modifier = GlanceModifier.width(pillWidth),
+            modifier = GlanceModifier.width(minWidth),
         )
     }
 }
@@ -291,12 +474,14 @@ fun ChangeText(quote: Quote, p: WidgetPalette, pill: Boolean, showValue: Boolean
 @Composable
 fun SparkImage(quote: Quote, width: Dp, height: Dp) {
     val density = LocalContext.current.resources.displayMetrics.density
-    val bitmap = remember(quote.spark, quote.previousClose, quote.isUp, width, height) {
-        val w = (width.value * density).toInt()
+    // Los widgets tienen un límite de memoria para imágenes: nunca más de 600 px de ancho.
+    val w = min(width, 600.dp / density)
+    val bitmap = remember(quote.spark, quote.previousClose, quote.isUp, w, height) {
+        val px = (w.value * density).toInt()
         Sparkline.render(
-            prices = Sparkline.downsample(quote.spark, w / 2),
+            prices = Sparkline.downsample(quote.spark, px / 2),
             baseline = quote.previousClose,
-            widthPx = w,
+            widthPx = px,
             heightPx = (height.value * density).toInt(),
             color = if (quote.isUp) WidgetPalette.UP else WidgetPalette.DOWN,
             baselineColor = WidgetPalette.BASELINE,
@@ -304,11 +489,7 @@ fun SparkImage(quote: Quote, width: Dp, height: Dp) {
         )
     }
     if (bitmap != null) {
-        Image(
-            provider = ImageProvider(bitmap),
-            contentDescription = null,
-            modifier = GlanceModifier.size(width, height),
-        )
+        Image(provider = ImageProvider(bitmap), contentDescription = null, modifier = GlanceModifier.size(width, height))
     } else {
         Spacer(GlanceModifier.size(width, height))
     }

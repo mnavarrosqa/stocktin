@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.stocktin.data.Chart
 import app.stocktin.data.ChartRange
+import app.stocktin.data.MARKET_SYMBOLS
 import app.stocktin.data.Repository
 import app.stocktin.data.SearchResult
 import app.stocktin.data.Settings
@@ -22,10 +23,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+/** Pestañas de la barra de abajo. */
+enum class Tab(val label: String) {
+    LISTS("Listas"),
+    MARKETS("Mercados"),
+    SETTINGS("Ajustes"),
+}
+
+/** Pantallas que se abren encima de las pestañas. */
 sealed interface Screen {
-    data object Home : Screen
     data object Search : Screen
-    data object Settings : Screen
     data class Detail(val symbol: String) : Screen
 }
 
@@ -59,7 +66,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _currentList = MutableStateFlow(repository.list(settings.currentList)?.id ?: "")
     val currentList: StateFlow<String> = _currentList.asStateFlow()
 
-    private val _stack = MutableStateFlow<List<Screen>>(listOf(Screen.Home))
+    private val _tab = MutableStateFlow(Tab.LISTS)
+    val tab: StateFlow<Tab> = _tab.asStateFlow()
+
+    /** Pantallas abiertas encima de la pestaña (vacía = solo la pestaña). */
+    private val _stack = MutableStateFlow<List<Screen>>(emptyList())
     val screen: StateFlow<List<Screen>> = _stack.asStateFlow()
 
     private val _query = MutableStateFlow("")
@@ -115,7 +126,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // Con la app a la vista, los precios se actualizan solos cada medio minuto.
         viewModelScope.launch {
             while (isActive) {
-                if (foreground && System.currentTimeMillis() - lastAttempt > LIVE_REFRESH_MS) refresh(quiet = true)
+                if (foreground && System.currentTimeMillis() - lastAttempt > LIVE_REFRESH_MS) {
+                    refresh(quiet = true)
+                    if (_tab.value == Tab.MARKETS) refreshMarkets()
+                }
                 delay(5_000)
             }
         }
@@ -129,10 +143,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun refreshMarkets() {
+        viewModelScope.launch { repository.refresh(MARKET_SYMBOLS) }
+    }
+
     // Navegación
 
+    fun selectTab(tab: Tab) {
+        _tab.value = tab
+        _stack.value = emptyList()
+        if (tab == Tab.MARKETS && MARKET_SYMBOLS.any { repository.quotes.value[it] == null }) refreshMarkets()
+    }
+
     fun open(screen: Screen) {
-        _stack.update { it + screen }
+        // Un detalle reemplaza al anterior en vez de apilarse (en pantallas anchas se ve al lado).
+        _stack.update { stack -> (if (screen is Screen.Detail) stack.filterNot { it is Screen.Detail } else stack) + screen }
         if (screen is Screen.Detail) loadDetail(screen.symbol)
         if (screen is Screen.Search) {
             _query.value = ""
@@ -143,15 +168,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Vuelve atrás; devuelve false si ya estaba en el inicio. */
     fun back(): Boolean {
         val stack = _stack.value
-        if (stack.size <= 1) return false
+        if (stack.isEmpty()) {
+            if (_tab.value == Tab.LISTS) return false
+            _tab.value = Tab.LISTS
+            return true
+        }
         _stack.value = stack.dropLast(1)
-        (stack.dropLast(1).last() as? Screen.Detail)?.let { loadDetail(it.symbol) }
+        (stack.dropLast(1).lastOrNull() as? Screen.Detail)?.let { loadDetail(it.symbol) }
         return true
     }
 
-    /** Desde un widget: abre el detalle de [symbol] encima del inicio. */
+    /** Desde un widget: abre el detalle de [symbol] encima de las listas. */
     fun openFromWidget(symbol: String) {
-        _stack.value = listOf(Screen.Home)
+        _tab.value = Tab.LISTS
+        _stack.value = emptyList()
         open(Screen.Detail(symbol))
     }
 

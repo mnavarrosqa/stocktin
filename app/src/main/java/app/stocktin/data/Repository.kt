@@ -42,15 +42,9 @@ class Repository private constructor(context: Context) {
     /** Todos los símbolos de todas las listas, sin repetir. */
     fun allSymbols(): List<String> = _lists.value.flatMap { it.symbols }.distinct()
 
-    /**
-     * Trae las cotizaciones de [symbols] (o de todas las listas). Si ya hay una actualización en
-     * curso, espera a que termine en vez de pedir lo mismo dos veces.
-     */
+    /** Trae las cotizaciones de [symbols] (o de todas las listas), de a una actualización por vez. */
     suspend fun refresh(symbols: List<String> = allSymbols()): Result<Unit> {
-        if (refreshLock.isLocked) {
-            refreshLock.withLock { }
-            return Result.success(Unit)
-        }
+        if (symbols.isEmpty()) return Result.success(Unit)
         return refreshLock.withLock {
             _refreshing.value = true
             try {

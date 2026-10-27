@@ -90,6 +90,7 @@ class WidgetConfigActivity : ComponentActivity() {
         var listId by remember { mutableStateOf(initial[WidgetKeys.LIST_ID] ?: lists.firstOrNull()?.id) }
         var symbol by remember { mutableStateOf(initial[WidgetKeys.SYMBOL] ?: repository.allSymbols().firstOrNull() ?: "SPY") }
         var theme by remember { mutableStateOf(WidgetTheme.from(initial[WidgetKeys.THEME])) }
+        var layout by remember { mutableStateOf(WidgetLayout.from(initial[WidgetKeys.LAYOUT])) }
         var spark by remember { mutableStateOf(initial[WidgetKeys.SHOW_SPARK] ?: true) }
         var name by remember { mutableStateOf(initial[WidgetKeys.SHOW_NAME] ?: true) }
         var pill by remember { mutableStateOf(initial[WidgetKeys.PILL] ?: false) }
@@ -108,7 +109,7 @@ class WidgetConfigActivity : ComponentActivity() {
                 if (ticker) {
                     Section("Símbolo")
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        repository.allSymbols().forEach { s ->
+                        (repository.allSymbols() + app.stocktin.data.MARKET_SYMBOLS).distinct().forEach { s ->
                             FilterChip(selected = s == symbol, onClick = { symbol = s }, label = { Text(s) })
                         }
                     }
@@ -120,18 +121,38 @@ class WidgetConfigActivity : ComponentActivity() {
                         }
                     }
                 }
+                if (!ticker) {
+                    Section("Diseño")
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        WidgetLayout.entries.forEach { l ->
+                            FilterChip(selected = l == layout, onClick = { layout = l }, label = { Text(l.label) })
+                        }
+                    }
+                    Text(
+                        if (layout == WidgetLayout.MOSAIC) {
+                            "Una baldosa por símbolo, más verde o más roja cuanto más se movió."
+                        } else {
+                            "Se adapta al tamaño: en widgets anchos agrega nombre, gráfico y pre/post, y en tablets usa dos columnas."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Section("Aspecto")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     WidgetTheme.entries.forEach { t ->
                         FilterChip(selected = t == theme, onClick = { theme = t }, label = { Text(t.label) })
                     }
                 }
-                if (!ticker) {
+                val list = !ticker && layout == WidgetLayout.LIST
+                if (list) {
                     Toggle("Minigráfico del día", "Se ve si el widget es bastante ancho", spark) { spark = it }
                     Toggle("Nombre de cada símbolo", null, name) { name = it }
                     Toggle("Pre-apertura y post-cierre", "El precio fuera de horario, debajo del cambio", ext) { ext = it }
                 }
-                Toggle("Cambio en etiqueta de color", "Como en la app Bolsa del iPhone", pill) { pill = it }
+                if (ticker || list) {
+                    Toggle("Cambio en etiqueta de color", "Como en la app Bolsa del iPhone", pill) { pill = it }
+                }
                 Toggle("Cambio en dinero", "En vez de porcentaje", value) { value = it }
                 Button(
                     onClick = {
@@ -139,6 +160,7 @@ class WidgetConfigActivity : ComponentActivity() {
                             listId?.let { prefs[WidgetKeys.LIST_ID] = it }
                             prefs[WidgetKeys.SYMBOL] = symbol
                             prefs[WidgetKeys.THEME] = theme.name
+                            prefs[WidgetKeys.LAYOUT] = layout.name
                             prefs[WidgetKeys.SHOW_SPARK] = spark
                             prefs[WidgetKeys.SHOW_NAME] = name
                             prefs[WidgetKeys.PILL] = pill

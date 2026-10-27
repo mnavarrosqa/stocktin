@@ -12,20 +12,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,6 +30,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import app.stocktin.widget.TickerWidgetReceiver
 import app.stocktin.widget.WatchlistWidgetReceiver
 
@@ -40,7 +42,7 @@ private val INTERVALS = listOf(15 to "Cada 15 minutos", 30 to "Cada 30 minutos",
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit) {
+fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding: Dp) {
     val minutes by viewModel.refreshMinutes.collectAsState()
     val saveBattery by viewModel.saveBattery.collectAsState()
     val showValue by viewModel.showValue.collectAsState()
@@ -50,16 +52,12 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit) {
     val snackbar = rememberMessages(viewModel)
     val context = LocalContext.current
 
+    val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
-        topBar = {
-            TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = { viewModel.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") }
-                },
-                title = { Text("Ajustes") },
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbar) },
+        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        topBar = { LargeTopAppBar(title = { Text("Ajustes", fontWeight = FontWeight.Bold) }, scrollBehavior = scroll) },
+        snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = bottomPadding)) },
     ) { padding ->
         Column(
             Modifier
@@ -168,6 +166,7 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp),
             )
+            Spacer(Modifier.height(bottomPadding))
         }
     }
 }

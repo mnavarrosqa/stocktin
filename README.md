@@ -25,7 +25,12 @@ Dos widgets, los dos redimensionables y configurables (mantenerlo presionado →
   - Cada widget puede mostrar **una lista distinta**.
   - Tocar una fila abre el gráfico de ese símbolo; el botón ↻ actualiza al instante.
   - Si no hay conexión muestra los últimos precios y lo avisa ("Sin conexión · 9:42").
-- **Un símbolo:** precio grande, cambio y gráfico del día de un solo símbolo.
+  - **Diseño Mosaico:** una baldosa por símbolo, más verde o más roja cuanto más se movió (como un
+    mapa de calor).
+  - Se adapta al tamaño: desde una columna con lo justo hasta dos columnas en tablets y foldables
+    desplegados; el encabezado se achica a una línea en widgets bajos.
+- **Un símbolo:** desde 1×1 (símbolo y cambio) hasta precio grande con gráfico del día; ancho y
+  bajo, todo en una fila.
 
 Se actualizan solos cada 15 min, 30 min o 1 h (o solo a mano). Con la bolsa de EE.UU. cerrada
 (noches y fines de semana) se puede ahorrar batería actualizando una vez por hora, salvo que la
@@ -33,12 +38,21 @@ lista tenga cripto.
 
 ## La app
 
+Inspirada en la app Bolsa de Apple y en Robinhood: títulos grandes, números que no "bailen"
+(cifras de ancho fijo) y una barra de pestañas flotante abajo (Listas, Mercados, Ajustes) con la
+búsqueda al lado.
+
+- **Foldables y tablets:** desplegada usa una barra lateral y muestra la lista y el detalle lado a
+  lado, separados justo en la bisagra. Medio plegada en modo mesa, el gráfico queda arriba y los
+  datos abajo.
+- **Mercados:** índices (S&P 500, Nasdaq, Merval…), cripto, materias primas y monedas en tarjetas
+  con su gráfico del día.
 - **Varias listas** (por ejemplo "USD", "Argentina", "Cripto"), con pestañas para pasar de una a otra.
 - **Búsqueda** por símbolo o nombre, con sugerencias (S&P 500, Nasdaq, Merval, Bitcoin, oro,
   dólar/peso…).
 - **Detalle** con gráfico de 1D, 5D, 1M, 6M, YTD, 1A, 5A y Máx: deslizá el dedo sobre el gráfico
-  para ver el precio de cada momento. Debajo, apertura, máximo y mínimo, rango de 52 semanas,
-  volumen y capitalización.
+  para ver el precio de cada momento (con vibración suave). Debajo, dónde está el precio en el
+  rango de 52 semanas, apertura, máximo y mínimo, volumen y capitalización.
 - Con la app abierta los precios se actualizan cada 30 segundos.
 - Tocá la etiqueta de color para alternar entre porcentaje y dinero.
 
