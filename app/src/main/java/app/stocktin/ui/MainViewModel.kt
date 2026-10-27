@@ -43,6 +43,10 @@ sealed interface UpdateState {
     val release: Release
 
     data class Available(override val release: Release) : UpdateState
+    /** Bajando el APK; [progress] es null mientras no se sabe el tamaño. */
+    data class Downloading(override val release: Release, val progress: Float?) : UpdateState
+    /** Descargada: falta tocar la notificación de la descarga para instalarla. */
+    data class Downloaded(override val release: Release) : UpdateState
 }
 
 /** Un aviso abajo de la pantalla, con un botón opcional (por ejemplo, Deshacer). */
@@ -109,6 +113,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val checkingUpdates: StateFlow<Boolean> = _checkingUpdates.asStateFlow()
 
     /** Mostrar el aviso de versión nueva (solo la primera vez que se encuentra). */
+    private val _lastUpdateCheck = MutableStateFlow(settings.lastUpdateCheck)
+    val lastUpdateCheck: StateFlow<Long> = _lastUpdateCheck.asStateFlow()
+
+    /** Novedades de la versión recién instalada, para mostrarlas una vez. */
+    private val _whatsNew = MutableStateFlow<Release?>(null)
+    val whatsNew: StateFlow<Release?> = _whatsNew.asStateFlow()
+
+    /** Historial de versiones (null mientras carga). */
+    private val _releases = MutableStateFlow<List<Release>?>(null)
+    val releases: StateFlow<List<Release>?> = _releases.asStateFlow()
+
+    private val _themeMode = MutableStateFlow(settings.themeMode)
+    val themeMode: StateFlow<String> = _themeMode.asStateFlow()
+
+    private val _dynamicColor = MutableStateFlow(settings.dynamicColor)
+    val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
+
+    private var downloadJob: Job? = null
+
     private val _updateDialog = MutableStateFlow(false)
     val updateDialog: StateFlow<Boolean> = _updateDialog.asStateFlow()
 
@@ -148,7 +171,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         RefreshScheduler.schedule(app)
-        if (settings.autoCheckUpdates && System.currentTimeMillis() - settings.lastUpdateCheck > UPDATE_CHECK_INTERVAL_MS) {
+        afterUpdate()
+        if (settings.downloadId >= 0 ||
+            (settings.autoCheckUpdates && System.currentTimeMillis() - settings.lastUpdateCheck > UPDATE_CHECK_INTERVAL_MS)
+        ) {
+            // También si había una descarga empezada: se busca la versión para seguir mostrándola.
             checkForUpdates(manual = false)
         }
         // Con la app a la vista, los precios se actualizan solos cada medio minuto.
@@ -401,23 +428,106 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { updater.checkForUpdate() }
                 .onSuccess { release ->
                     settings.lastUpdateCheck = System.currentTimeMillis()
-                    if (release != null) {
-                        _update.value = UpdateState.Available(release)
-                        if (!manual) _updateDialog.value = true
-                    } else if (manual) {
-                        showMessage("Ya tenés la última versión")
+                    _lastUpdateCheck.value = settings.lastUpdateCheck
+                    when {
+                        release == null -> if (manual) showMessage("Ya tenés la última versión")
+                        // Ya se estaba bajando o ya se bajó: se retoma.
+                        settings.downloadId >= 0 && settings.downloadVersion == release.versionCode ->
+                            watchDownload(release, settings.downloadId)
+                        else -> {
+                            _update.value = UpdateState.Available(release)
+                            if (!manual) _updateDialog.value = true
+                        }
                     }
                 }
-                .onFailure { if (manual) showMessage("No se pudo buscar actualizaciones") }
+                .onFailure { if (manual) showMessage("No se pudo buscar actualizaciones. Revisá la conexión.") }
             _checkingUpdates.value = false
         }
     }
 
-    /** Lo que hay que abrir para bajar la versión nueva (el navegador descarga el APK). */
-    fun downloadUpdateIntent(): android.content.Intent? {
-        val release = _update.value?.release ?: return null
+    /**
+     * Baja la versión nueva dentro de la app. Devuelve qué abrir: la lista de descargas si ya está
+     * bajada, el navegador si el administrador de descargas no anda, o nada mientras baja.
+     */
+    fun downloadUpdate(): android.content.Intent? {
+        val state = _update.value ?: return null
         _updateDialog.value = false
-        return updater.downloadIntent(release)
+        when (state) {
+            is UpdateState.Downloaded -> return updater.downloadsIntent()
+            is UpdateState.Downloading -> return null
+            is UpdateState.Available -> Unit
+        }
+        val id = runCatching { updater.startDownload(state.release) }.getOrElse { return updater.browserIntent(state.release) }
+        settings.downloadId = id
+        settings.downloadVersion = state.release.versionCode
+        watchDownload(state.release, id)
+        return null
+    }
+
+    /** Sigue la descarga [id] hasta que termina, mostrando el avance. */
+    private fun watchDownload(release: Release, id: Long) {
+        downloadJob?.cancel()
+        downloadJob = viewModelScope.launch {
+            while (isActive) {
+                val progress = runCatching { updater.progress(id) }.getOrNull()
+                when {
+                    progress == null || progress.failed -> {
+                        settings.downloadId = -1
+                        _update.value = UpdateState.Available(release)
+                        showMessage("No se pudo descargar la actualización. Probá de nuevo.")
+                        return@launch
+                    }
+                    progress.done -> {
+                        _update.value = UpdateState.Downloaded(release)
+                        showMessage("Lista: tocá la notificación de la descarga para instalarla")
+                        return@launch
+                    }
+                    else -> _update.value = UpdateState.Downloading(release, progress.fraction)
+                }
+                delay(400)
+            }
+        }
+    }
+
+    /** Después de actualizar: borra el APK bajado y prepara las novedades de esta versión. */
+    private fun afterUpdate() {
+        val installed = runCatching { updater.installedVersionCode }.getOrDefault(0)
+        if (settings.downloadId >= 0 && settings.downloadVersion <= installed) {
+            updater.removeDownload(settings.downloadId)
+            settings.downloadId = -1
+        }
+        val seen = settings.lastSeenVersion
+        if (seen == 0) {
+            // Primera vez que se abre: no hay novedades que mostrar.
+            settings.lastSeenVersion = installed
+        } else if (installed > seen) {
+            settings.lastSeenVersion = installed
+            viewModelScope.launch { _whatsNew.value = runCatching { updater.release(installed) }.getOrNull() }
+        }
+    }
+
+    fun dismissWhatsNew() {
+        _whatsNew.value = null
+    }
+
+    fun loadReleases() {
+        if (_releases.value != null) return
+        viewModelScope.launch {
+            _releases.value = runCatching { updater.releases() }.getOrElse {
+                showMessage("No se pudo cargar el historial de versiones")
+                null
+            }
+        }
+    }
+
+    fun setThemeMode(mode: String) {
+        settings.themeMode = mode
+        _themeMode.value = mode
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        settings.dynamicColor = enabled
+        _dynamicColor.value = enabled
     }
 
     fun dismissUpdateDialog() {

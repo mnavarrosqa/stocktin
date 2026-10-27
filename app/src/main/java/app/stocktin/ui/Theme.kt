@@ -32,13 +32,18 @@ private val Dark = darkColorScheme(
     surface = Color(0xFF111413),
 )
 
-/** Colores del sistema (Material You) si el teléfono los tiene; si no, un verde propio. */
+/** Colores del fondo de pantalla (Material You) si el teléfono los tiene y están elegidos; si no, el verde de Stocktin. */
 @Composable
-fun StocktinTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+fun StocktinTheme(themeMode: String = "SYSTEM", dynamicColor: Boolean = true, content: @Composable () -> Unit) {
+    val dark = when (themeMode) {
+        "LIGHT" -> false
+        "DARK" -> true
+        else -> isSystemInDarkTheme()
+    }
     val context = LocalContext.current
     val scheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         dark -> Dark
         else -> Light
     }

@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -70,11 +72,16 @@ import app.stocktin.data.Quote
 /** Números con todas las cifras del mismo ancho, para que los precios no "bailen" al cambiar. */
 fun TextStyle.tabular() = copy(fontFeatureSettings = "tnum")
 
+/** El ícono de una pestaña; con [badge], un punto que avisa algo (por ejemplo, una versión nueva). */
 @Composable
-fun TabIcon(tab: Tab, contentDescription: String?) = when (tab) {
-    Tab.LISTS -> Icon(Icons.AutoMirrored.Filled.List, contentDescription)
-    Tab.MARKETS -> Icon(painterResource(R.drawable.ic_tab_markets), contentDescription)
-    Tab.SETTINGS -> Icon(Icons.Filled.Settings, contentDescription)
+fun TabIcon(tab: Tab, contentDescription: String?, badge: Boolean = false) {
+    BadgedBox(badge = { if (badge) Badge() }) {
+        when (tab) {
+            Tab.LISTS -> Icon(Icons.AutoMirrored.Filled.List, contentDescription)
+            Tab.MARKETS -> Icon(painterResource(R.drawable.ic_tab_markets), contentDescription)
+            Tab.SETTINGS -> Icon(Icons.Filled.Settings, contentDescription)
+        }
+    }
 }
 
 /**
@@ -82,7 +89,13 @@ fun TabIcon(tab: Tab, contentDescription: String?) = when (tab) {
  * en las apps actuales de Google y Apple): la lista llega hasta el borde y la barra no le quita lugar.
  */
 @Composable
-fun FloatingTabBar(current: Tab, onSelect: (Tab) -> Unit, onSearch: () -> Unit, modifier: Modifier = Modifier) {
+fun FloatingTabBar(
+    current: Tab,
+    onSelect: (Tab) -> Unit,
+    onSearch: () -> Unit,
+    modifier: Modifier = Modifier,
+    badge: Tab? = null,
+) {
     Row(
         modifier,
         verticalAlignment = Alignment.CenterVertically,
@@ -95,7 +108,7 @@ fun FloatingTabBar(current: Tab, onSelect: (Tab) -> Unit, onSearch: () -> Unit, 
         ) {
             Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 Tab.entries.forEach { item ->
-                    TabPill(item, selected = item == current, onClick = { onSelect(item) })
+                    TabPill(item, selected = item == current, badge = item == badge, onClick = { onSelect(item) })
                 }
             }
         }
@@ -116,7 +129,7 @@ fun FloatingTabBar(current: Tab, onSelect: (Tab) -> Unit, onSearch: () -> Unit, 
 
 /** Una pestaña: solo el ícono, o el ícono con su nombre cuando está elegida. */
 @Composable
-private fun TabPill(tab: Tab, selected: Boolean, onClick: () -> Unit) {
+private fun TabPill(tab: Tab, selected: Boolean, badge: Boolean, onClick: () -> Unit) {
     val background by animateColorAsState(
         if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
         label = "tabBackground",
@@ -136,7 +149,7 @@ private fun TabPill(tab: Tab, selected: Boolean, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CompositionLocalProvider(LocalContentColor provides content) {
-            TabIcon(tab, contentDescription = if (selected) null else tab.label)
+            TabIcon(tab, contentDescription = if (selected) null else tab.label, badge = badge)
         }
         if (selected) {
             Spacer(Modifier.width(8.dp))

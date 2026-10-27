@@ -22,6 +22,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,7 +69,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
-            StocktinTheme {
+            val themeMode by viewModel.themeMode.collectAsState()
+            val dynamicColor by viewModel.dynamicColor.collectAsState()
+            StocktinTheme(themeMode = themeMode, dynamicColor = dynamicColor) {
                 App(viewModel, onUpdate = ::update)
             }
         }
@@ -93,12 +96,14 @@ class MainActivity : ComponentActivity() {
         intent?.getStringExtra(EXTRA_SYMBOL)?.let(viewModel::openFromWidget)
     }
 
-    /** Abre la descarga de la versión nueva; al terminar, se toca la notificación para instalarla. */
+    /**
+     * Baja la versión nueva dentro de la app; si ya está bajada, abre la lista de descargas para
+     * instalarla (la app no instala nada por su cuenta).
+     */
     private fun update() {
-        val intent = viewModel.downloadUpdateIntent() ?: return
+        val intent = viewModel.downloadUpdate() ?: return
         runCatching { startActivity(intent) }
-            .onSuccess { viewModel.showMessage("Cuando termine la descarga, tocala para instalar") }
-            .onFailure { viewModel.showMessage("No hay un navegador para descargar la actualización") }
+            .onFailure { viewModel.showMessage("Abrí la app Archivos → Descargas y tocá el archivo de Stocktin") }
     }
 
     companion object {
@@ -140,8 +145,25 @@ private fun App(viewModel: MainViewModel, onUpdate: () -> Unit) {
                     if (release.notes.isEmpty()) Text("Se instala encima, sin perder tus listas.")
                 }
             },
-            confirmButton = { TextButton(onClick = onUpdate) { Text("Actualizar") } },
+            confirmButton = { TextButton(onClick = onUpdate) { Text("Descargar") } },
             dismissButton = { TextButton(onClick = viewModel::dismissUpdateDialog) { Text("Ahora no") } },
+        )
+    }
+
+    // Después de actualizar, una vez: qué trae esta versión.
+    val whatsNew by viewModel.whatsNew.collectAsState()
+    whatsNew?.let { news ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissWhatsNew,
+            icon = { Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(48.dp)) },
+            title = { Text("Novedades de la ${news.versionName}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    news.notes.take(10).forEach { Text("• $it") }
+                    if (news.notes.isEmpty()) Text("Mejoras y correcciones.")
+                }
+            },
+            confirmButton = { TextButton(onClick = viewModel::dismissWhatsNew) { Text("Listo") } },
         )
     }
 }
@@ -160,6 +182,7 @@ private fun TabContent(viewModel: MainViewModel, tab: Tab, selectedSymbol: Strin
 /** Teléfono: la pestaña de fondo, la barra flotante abajo y el detalle o la búsqueda encima. */
 @Composable
 private fun PhoneLayout(viewModel: MainViewModel, tab: Tab, top: Screen?, onUpdate: () -> Unit) {
+    val update by viewModel.update.collectAsState()
     val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Box(Modifier.fillMaxSize()) {
         TabContent(viewModel, tab, selectedSymbol = null, bottomPadding = 96.dp + navBar, onUpdate = onUpdate)
@@ -169,7 +192,12 @@ private fun PhoneLayout(viewModel: MainViewModel, tab: Tab, top: Screen?, onUpda
             exit = slideOutVertically { it } + fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 12.dp),
         ) {
-            FloatingTabBar(current = tab, onSelect = viewModel::selectTab, onSearch = { viewModel.open(Screen.Search) })
+            FloatingTabBar(
+                current = tab,
+                onSelect = viewModel::selectTab,
+                onSearch = { viewModel.open(Screen.Search) },
+                badge = if (update != null) Tab.SETTINGS else null,
+            )
         }
         // Mantener la última pantalla mientras se anima la salida.
         var shown by remember { mutableStateOf(top) }
@@ -196,6 +224,7 @@ private fun PhoneLayout(viewModel: MainViewModel, tab: Tab, top: Screen?, onUpda
  */
 @Composable
 private fun WideLayout(viewModel: MainViewModel, tab: Tab, detail: Screen.Detail?, onUpdate: () -> Unit) {
+    val update by viewModel.update.collectAsState()
     val fold = rememberFoldingFeature()
     val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
@@ -227,7 +256,7 @@ private fun WideLayout(viewModel: MainViewModel, tab: Tab, detail: Screen.Detail
                         NavigationRailItem(
                             selected = tab == item,
                             onClick = { viewModel.selectTab(item) },
-                            icon = { TabIcon(item, contentDescription = null) },
+                            icon = { TabIcon(item, contentDescription = null, badge = item == Tab.SETTINGS && update != null) },
                             label = { Text(item.label) },
                         )
                     }
@@ -241,6 +270,7 @@ private fun WideLayout(viewModel: MainViewModel, tab: Tab, detail: Screen.Detail
                         current = tab,
                         onSelect = viewModel::selectTab,
                         onSearch = { viewModel.open(Screen.Search) },
+                        badge = if (update != null) Tab.SETTINGS else null,
                         modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 12.dp),
                     )
                 }

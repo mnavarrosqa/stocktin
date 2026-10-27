@@ -39,6 +39,7 @@ import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.lifecycle.lifecycleScope
 import app.stocktin.data.Repository
+import app.stocktin.data.Settings
 import app.stocktin.ui.StocktinTheme
 import kotlinx.coroutines.launch
 
@@ -62,7 +63,8 @@ class WidgetConfigActivity : ComponentActivity() {
             val glanceId = GlanceAppWidgetManager(this@WidgetConfigActivity).getGlanceIdBy(appWidgetId)
             val prefs = getAppWidgetState(this@WidgetConfigActivity, PreferencesGlanceStateDefinition, glanceId)
             setContent {
-                StocktinTheme {
+                val settings = Settings(this@WidgetConfigActivity)
+                StocktinTheme(settings.themeMode, settings.dynamicColor) {
                     ConfigScreen(ticker, prefs) { save ->
                         lifecycleScope.launch {
                             updateAppWidgetState(this@WidgetConfigActivity, glanceId) { save(it) }

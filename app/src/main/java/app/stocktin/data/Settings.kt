@@ -44,6 +44,30 @@ class Settings(context: Context) {
         get() = prefs.getString("recent_searches", null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
         set(value) = prefs.edit().putString("recent_searches", value.take(8).joinToString("\n")).apply()
 
+    /** Tema de la app: SYSTEM, LIGHT o DARK. */
+    var themeMode: String
+        get() = prefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM"
+        set(value) = prefs.edit().putString("theme_mode", value).apply()
+
+    /** Usar los colores del fondo de pantalla (Material You) en vez del verde de Stocktin. */
+    var dynamicColor: Boolean
+        get() = prefs.getBoolean("dynamic_color", true)
+        set(value) = prefs.edit().putBoolean("dynamic_color", value).apply()
+
+    /** Última versión de la que se mostraron las novedades (0 = todavía ninguna). */
+    var lastSeenVersion: Int
+        get() = prefs.getInt("last_seen_version", 0)
+        set(value) = prefs.edit().putInt("last_seen_version", value).apply()
+
+    /** Descarga de una actualización en curso o terminada (-1 = ninguna) y de qué versión es. */
+    var downloadId: Long
+        get() = prefs.getLong("download_id", -1)
+        set(value) = prefs.edit().putLong("download_id", value).apply()
+
+    var downloadVersion: Int
+        get() = prefs.getInt("download_version", 0)
+        set(value) = prefs.edit().putInt("download_version", value).apply()
+
     /** Mostrar el cambio en dinero en vez de en porcentaje. */
     var showChangeValue: Boolean
         get() = prefs.getBoolean("show_change_value", false)
