@@ -228,7 +228,7 @@ class WatchlistWidget(
         val columns = if (width >= 460.dp) 2 else 1
         val density = RowDensity.of(width / columns - if (columns > 1) 12.dp else 0.dp)
         val lines = ceil(rows.size / columns.toDouble()).toInt()
-        val fill = lines <= 10 && lines * density.minHeight <= height
+        val fill = lines <= 10 && density.minHeight * lines <= height
         val last = rows.chunked(columns).lastOrNull().orEmpty().map { it.first }.toSet()
         Grid(rows, columns, fill) { (symbol, quote) ->
             Column(
