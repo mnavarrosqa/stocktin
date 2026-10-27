@@ -16,7 +16,9 @@ import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.stocktin.data.YahooApi
 import app.stocktin.ui.MainActivity
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import androidx.window.layout.FoldingFeature
 import androidx.window.testing.layout.FoldingFeature as fakeFoldingFeature
 import androidx.window.testing.layout.TestWindowLayoutInfo
@@ -112,6 +114,7 @@ class ScreenshotTest {
         shot("05_detalle_abajo")
     }
 
+    @OptIn(ExperimentalRoborazziApi::class)
     @Test
     fun alert() {
         launch()
@@ -119,7 +122,8 @@ class ScreenshotTest {
         settle()
         compose.onNodeWithContentDescription("Nueva alerta de precio").performClick()
         settle()
-        shot("04b_nueva_alerta")
+        // La hoja va en otra ventana: se captura la pantalla entera.
+        captureScreenRoboImage("screenshots/04b_nueva_alerta.png")
     }
 
     @Test
