@@ -10,6 +10,8 @@ import app.stocktin.data.Quote
 import app.stocktin.data.STRIP_SYMBOLS
 import app.stocktin.data.SortMode
 import androidx.compose.foundation.Image
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.painterResource
@@ -100,6 +102,15 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
     var dragOrder by remember(list.id) { mutableStateOf<List<String>?>(null) }
     val shown = dragOrder ?: sorted
     val listState = rememberLazyListState()
+    // El precio más ancho de la lista marca el ancho de la columna de precios.
+    val measurer = rememberTextMeasurer()
+    val priceStyle = MaterialTheme.typography.titleMedium.tabular().copy(fontWeight = FontWeight.SemiBold)
+    val density = LocalDensity.current
+    val priceWidth = remember(list.symbols, quotes, priceStyle) {
+        val widest = list.symbols.mapNotNull { quotes[it] }
+            .maxOfOrNull { measurer.measure(Format.price(it.price), priceStyle).size.width } ?: 0
+        with(density) { widest.toDp() } + 10.dp
+    }
     val reorder = rememberReorderableLazyListState(listState) { from, to ->
         val current = dragOrder ?: sorted
         val fromIndex = current.indexOfFirst { it == from.key }
@@ -254,6 +265,7 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                                 onClick = { viewModel.open(Screen.Detail(symbol)) },
                                 onToggleValue = { viewModel.setShowValue(!showValue) },
                                 onRemove = { viewModel.removeSymbol(symbol) },
+                                priceWidth = priceWidth,
                                 dragModifier = if (editing) {
                                     Modifier
                                 } else {

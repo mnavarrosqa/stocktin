@@ -61,6 +61,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.R
 import app.stocktin.data.Format
@@ -157,6 +158,8 @@ fun QuoteRow(
     onToggleValue: () -> Unit,
     onRemove: () -> Unit,
     /** Mantener presionada la fila y arrastrar para moverla. */
+    /** Ancho del precio más largo de la lista: así los precios quedan alineados sin espacio de más. */
+    priceWidth: Dp = 96.dp,
     dragModifier: Modifier = Modifier,
     /** La manija ≡ del modo edición: arrastra sin esperar. */
     handleModifier: Modifier = Modifier,
@@ -186,7 +189,7 @@ fun QuoteRow(
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(if (compact) 1f else 1.4f)) {
                 Text(symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
                 if (quote != null) {
                     Text(
@@ -218,17 +221,19 @@ fun QuoteRow(
                 return@Row
             }
             if (!compact) {
+                // El minigráfico se estira hasta el precio.
+                Spacer(Modifier.width(8.dp))
                 Sparkline(
                     prices = quote.spark,
                     baseline = quote.previousClose,
                     color = changeColor(quote.change),
-                    modifier = Modifier.width(60.dp).height(30.dp),
+                    modifier = Modifier.weight(1f).widthIn(max = 180.dp).height(32.dp),
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(10.dp))
             }
             Column(horizontalAlignment = Alignment.End) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    FlashingPrice(symbol, quote.price)
+                    FlashingPrice(symbol, quote.price, priceWidth)
                     Spacer(Modifier.width(10.dp))
                     ChangePill(quote, showValue, onToggleValue)
                 }
@@ -290,7 +295,7 @@ fun SwipeToRemove(enabled: Boolean, onRemove: () -> Unit, content: @Composable (
 
 /** El precio, con un destello verde o rojo cuando cambia (como en las apps de los brokers). */
 @Composable
-private fun FlashingPrice(symbol: String, price: Double) {
+private fun FlashingPrice(symbol: String, price: Double, width: Dp) {
     val flash = remember(symbol) { Animatable(Color.Transparent) }
     var last by remember(symbol) { mutableStateOf(price) }
     LaunchedEffect(symbol, price) {
@@ -307,7 +312,7 @@ private fun FlashingPrice(symbol: String, price: Double) {
         // Ancho mínimo fijo: así los minigráficos quedan alineados en columna.
         textAlign = TextAlign.End,
         modifier = Modifier
-            .widthIn(min = 96.dp)
+            .widthIn(min = width)
             .clip(RoundedCornerShape(6.dp))
             .background(flash.value)
             .padding(horizontal = 4.dp, vertical = 1.dp),
