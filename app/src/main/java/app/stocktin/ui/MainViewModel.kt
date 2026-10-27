@@ -40,7 +40,6 @@ sealed interface UpdateState {
     val release: Release
 
     data class Available(override val release: Release) : UpdateState
-    data class Downloading(override val release: Release, val progress: Float) : UpdateState
 }
 
 data class ChartState(
@@ -333,22 +332,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun installUpdate() {
-        val release = _update.value?.release ?: return
+    /** Lo que hay que abrir para bajar la versión nueva (el navegador descarga el APK). */
+    fun downloadUpdateIntent(): android.content.Intent? {
+        val release = _update.value?.release ?: return null
         _updateDialog.value = false
-        viewModelScope.launch {
-            _update.value = UpdateState.Downloading(release, 0f)
-            runCatching {
-                val apk = updater.download(release) { progress -> _update.value = UpdateState.Downloading(release, progress) }
-                updater.install(apk)
-            }.onFailure { _message.value = "No se pudo descargar la actualización" }
-            _update.value = UpdateState.Available(release)
-        }
+        return updater.downloadIntent(release)
     }
-
-    fun canInstallUpdates(): Boolean = updater.canInstall()
-
-    fun installPermissionIntent() = updater.installPermissionIntent()
 
     fun dismissUpdateDialog() {
         _updateDialog.value = false

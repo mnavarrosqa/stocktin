@@ -136,8 +136,7 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
                     )
                     Text(
                         when (val u = update) {
-                            is UpdateState.Downloading -> "Descargando… ${(u.progress * 100).toInt()} %"
-                            is UpdateState.Available -> "Se instala encima, sin perder tus listas"
+                            is UpdateState.Available -> "Se descarga y se instala encima, sin perder tus listas"
                             null -> "Versión instalada: ${viewModel.installedVersion}"
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -145,7 +144,7 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
                     )
                 }
                 when {
-                    checking || update is UpdateState.Downloading -> CircularProgressIndicator(Modifier.size(24.dp))
+                    checking -> CircularProgressIndicator(Modifier.size(24.dp))
                     update is UpdateState.Available -> FilledTonalButton(onClick = onUpdate) { Text("Actualizar") }
                     else -> FilledTonalButton(onClick = { viewModel.checkForUpdates(manual = true) }) { Text("Buscar") }
                 }

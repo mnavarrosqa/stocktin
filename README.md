@@ -7,7 +7,9 @@ pantalla de inicio pensado para ser mejor que el de Yahoo Finance.
 Abrilo desde el teléfono para instalar. Requiere Android 9 o superior.
 
 **Actualizar:** la app busca versiones nuevas al abrirse (como mucho cada 6 horas) y muestra un
-aviso con las novedades y el botón **Actualizar**: descarga el APK y abre el instalador de Android.
+aviso con las novedades y el botón **Actualizar**, que descarga el APK con el navegador; al
+terminar, se toca la descarga para instalarla encima. La app no pide permiso para instalar apps
+por su cuenta: es lo que hace que Play Protect la confunda con apps dañinas.
 También se puede buscar a mano en Ajustes → Actualizaciones de la app.
 
 ## El widget

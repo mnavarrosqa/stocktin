@@ -92,14 +92,12 @@ class MainActivity : ComponentActivity() {
         intent?.getStringExtra(EXTRA_SYMBOL)?.let(viewModel::openFromWidget)
     }
 
-    /** Android pide permiso una vez para que la app pueda instalar sus actualizaciones. */
+    /** Abre la descarga de la versión nueva; al terminar, se toca la notificación para instalarla. */
     private fun update() {
-        if (viewModel.canInstallUpdates()) {
-            viewModel.installUpdate()
-        } else {
-            viewModel.showMessage("Permití instalar apps desde Stocktin y volvé a tocar Actualizar")
-            startActivity(viewModel.installPermissionIntent())
-        }
+        val intent = viewModel.downloadUpdateIntent() ?: return
+        runCatching { startActivity(intent) }
+            .onSuccess { viewModel.showMessage("Cuando termine la descarga, tocala para instalar") }
+            .onFailure { viewModel.showMessage("No hay un navegador para descargar la actualización") }
     }
 
     companion object {
