@@ -335,7 +335,8 @@ class WatchlistWidget(
             Column(horizontalAlignment = Alignment.End) {
                 if (big) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        PriceText(quote, p, 16.sp)
+                        // Ancho fijo para que los minigráficos queden alineados en columna.
+                        PriceText(quote, p, 16.sp, width = 88.dp)
                         Spacer(GlanceModifier.width(8.dp))
                         ChangeText(quote, p, options.pill, options.showValue, 14.sp, 76.dp)
                     }
@@ -440,7 +441,7 @@ class WatchlistWidget(
         fun heatColor(percent: Double?): Color {
             if (percent == null) return NEUTRAL
             val strength = (abs(percent) / 3.0).coerceIn(0.0, 1.0).toFloat()
-            return lerp(NEUTRAL, if (percent >= 0) UP else DOWN, 0.25f + 0.75f * strength)
+            return lerp(NEUTRAL, if (percent >= 0) UP else DOWN, 0.45f + 0.55f * strength)
         }
     }
 }
@@ -458,11 +459,12 @@ fun GlanceModifier.widgetCorners(): GlanceModifier =
     }
 
 @Composable
-fun PriceText(quote: Quote, p: WidgetPalette, fontSize: TextUnit) {
+fun PriceText(quote: Quote, p: WidgetPalette, fontSize: TextUnit, width: Dp? = null) {
     Text(
         Format.price(quote.price),
         maxLines = 1,
-        style = TextStyle(color = p.text, fontSize = fontSize, fontWeight = FontWeight.Bold),
+        style = TextStyle(color = p.text, fontSize = fontSize, fontWeight = FontWeight.Bold, textAlign = TextAlign.End),
+        modifier = if (width != null) GlanceModifier.width(width) else GlanceModifier,
     )
 }
 

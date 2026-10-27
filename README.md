@@ -30,6 +30,8 @@ Dos widgets, los dos redimensionables y configurables (mantenerlo presionado →
     mapa de calor).
   - Se adapta al tamaño: desde una columna con lo justo hasta dos columnas en tablets y foldables
     desplegados; el encabezado se achica a una línea en widgets bajos.
+- Aspecto **Material You** (el que viene por defecto): toma los colores del fondo de pantalla, como
+  los widgets de Google. En el encabezado, ▲ cuántos suben y ▼ cuántos bajan.
 - **Un símbolo:** desde 1×1 (símbolo y cambio) hasta precio grande con gráfico del día; ancho y
   bajo, todo en una fila.
 
@@ -43,8 +45,9 @@ Inspirada en la app Bolsa de Apple y en Robinhood: títulos grandes, números qu
 (cifras de ancho fijo) y una barra de pestañas flotante abajo (Listas, Mercados, Ajustes) con la
 búsqueda al lado.
 
-- **Foldables y tablets:** desplegada usa una barra lateral y muestra la lista y el detalle lado a
-  lado, separados justo en la bisagra. Medio plegada en modo mesa, el gráfico queda arriba y los
+- **Foldables y tablets:** desplegada muestra la lista y el detalle lado a lado, separados justo en
+  la bisagra; en un foldable las pestañas quedan en la barra flotante y en tablets grandes pasan a
+  una barra lateral. En paneles angostos las filas sacan el minigráfico para que entre el nombre. Medio plegada en modo mesa, el gráfico queda arriba y los
   datos abajo.
 - **Mercados:** índices (S&P 500, Nasdaq, Merval…), cripto, materias primas y monedas en tarjetas
   con su gráfico del día.
@@ -56,6 +59,8 @@ búsqueda al lado.
   rango de 52 semanas, apertura, máximo y mínimo, volumen y capitalización.
 - Arriba de las listas, una tira con S&P 500, Nasdaq, Dow y Bitcoin; debajo, cuántos símbolos
   suben y cuántos bajan, con una barra de amplitud.
+- **Arrastrar y soltar** para ordenar: mantené presionado un símbolo y movelo (o usá la manija ≡
+  en "Ordenar y quitar símbolos").
 - **Ordenar** por mayor suba, mayor baja o símbolo, y **deslizar una fila** para quitarla (con
   Deshacer). Los precios destellan en verde o rojo cuando cambian.
 - La búsqueda muestra tus búsquedas recientes y lo más buscado del día en Yahoo Finance.
@@ -89,7 +94,8 @@ clave de debug).
 Cada push a una rama que no sea `main` genera capturas de la app con datos armados (Robolectric +
 Roborazzi, `ScreenshotTest`) y las deja en la rama
 [`screenshots`](https://github.com/mnavarrosqa/stocktin/tree/screenshots/app/screenshots):
-listas, mercados, detalle, búsqueda, ajustes, modo oscuro y foldable desplegado.
+listas, mercados, detalle, búsqueda, ajustes, modo oscuro, foldable con bisagra y tablet, y los
+widgets en varios tamaños y aspectos (`WidgetScreenshotTest`).
 
 ## Tests
 
