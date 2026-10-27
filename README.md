@@ -21,7 +21,6 @@ Dos widgets, los dos redimensionables y configurables (mantenerlo presionado →
   - **5 aspectos:** Automático (sigue el modo oscuro), Claro, Oscuro, Negro (para pantallas OLED)
     y Transparente.
   - Cambio como **texto de color** o **etiqueta de color**, en **porcentaje** o en **dinero**.
-  - Se adapta al tamaño: en widgets angostos saca el gráfico y achica la letra.
   - Cada widget puede mostrar **una lista distinta**.
   - Tocar una fila abre el gráfico de ese símbolo; el botón ↻ actualiza al instante.
   - Si no hay conexión muestra los últimos precios y lo avisa ("Sin conexión · 9:42").
