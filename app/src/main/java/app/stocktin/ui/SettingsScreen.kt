@@ -38,7 +38,7 @@ import androidx.compose.foundation.layout.height
 import app.stocktin.widget.TickerWidgetReceiver
 import app.stocktin.widget.WatchlistWidgetReceiver
 
-private val INTERVALS = listOf(15 to "Cada 15 minutos", 30 to "Cada 30 minutos", 60 to "Cada 1 hora", 0 to "Solo a mano (botón ↻)")
+private val INTERVALS = listOf(15 to "Cada 15 minutos", 30 to "Cada 30 minutos", 60 to "Cada 1 hora", 0 to "Solo a mano")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,7 +104,7 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
             }
             Text(
                 "Android no deja actualizar widgets más seguido que cada 15 minutos en segundo plano. " +
-                    "Con la app abierta los precios se actualizan cada 30 segundos, y el botón ↻ del widget actualiza al instante.",
+                    "Con la app abierta los precios se actualizan cada 30 segundos, y el botón de actualizar del widget lo hace al instante.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
