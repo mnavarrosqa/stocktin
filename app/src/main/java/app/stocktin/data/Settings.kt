@@ -59,15 +59,6 @@ class Settings(context: Context) {
         get() = prefs.getInt("last_seen_version", 0)
         set(value) = prefs.edit().putInt("last_seen_version", value).apply()
 
-    /** Descarga de una actualización en curso o terminada (-1 = ninguna) y de qué versión es. */
-    var downloadId: Long
-        get() = prefs.getLong("download_id", -1)
-        set(value) = prefs.edit().putLong("download_id", value).apply()
-
-    var downloadVersion: Int
-        get() = prefs.getInt("download_version", 0)
-        set(value) = prefs.edit().putInt("download_version", value).apply()
-
     /** Mostrar el cambio en dinero en vez de en porcentaje. */
     var showChangeValue: Boolean
         get() = prefs.getBoolean("show_change_value", false)

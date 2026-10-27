@@ -290,16 +290,13 @@ private fun VersionCard(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    is UpdateState.Downloaded -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            "Lista para instalar. Tocá la notificación de la descarga, o abrí Descargas y tocá el archivo. Se instala encima sin perder tus listas.",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Button(onClick = onUpdate, modifier = Modifier.fillMaxWidth()) { Text("Abrir descargas") }
-                    }
+                    is UpdateState.Installing -> Text(
+                        "Confirmá en la ventana de Android para instalarla. Se instala encima, sin perder tus listas.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                     is UpdateState.Available -> Button(onClick = onUpdate, modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            "Descargar " + update.release.versionName +
+                            "Actualizar a la " + update.release.versionName +
                                 (update.release.sizeBytes.takeIf { it > 0 }?.let { " · ${Format.compact(it.toDouble())}B" } ?: ""),
                         )
                     }

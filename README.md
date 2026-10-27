@@ -7,10 +7,11 @@ pantalla de inicio pensado para ser mejor que el de Yahoo Finance.
 Abrilo desde el teléfono para instalar. Requiere Android 9 o superior.
 
 **Actualizar:** la app busca versiones nuevas al abrirse (como mucho cada 6 horas) y avisa con las
-novedades; **Descargar** baja el APK con el administrador de descargas de Android (el avance se ve
-en Ajustes) y al terminar se toca la notificación de la descarga para instalarla encima. La app no
-pide permiso para instalar apps por su cuenta: es lo que hace que Play Protect la confunda con apps
-dañinas. Después de actualizar muestra las novedades, y en Ajustes está el historial de versiones.
+novedades. **Actualizar** la baja (el avance se ve en Ajustes) y Android pregunta "¿Actualizar
+Stocktin?": se instala encima sin perder nada. La primera vez Android pide permitir que Stocktin
+instale apps. Ese permiso puede hacer que Play Protect marque la app como desconocida o dañina al
+instalarla: en ese aviso, "Más detalles → Instalar de todas formas". Después de actualizar muestra
+las novedades, y en Ajustes está el historial de versiones.
 
 ## El widget
 

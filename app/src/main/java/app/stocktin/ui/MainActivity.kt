@@ -97,13 +97,12 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Baja la versión nueva dentro de la app; si ya está bajada, abre la lista de descargas para
-     * instalarla (la app no instala nada por su cuenta).
+     * Baja la versión nueva y abre el "¿Actualizar Stocktin?" de Android. La primera vez lleva al
+     * permiso para que Stocktin pueda instalar apps.
      */
     private fun update() {
-        val intent = viewModel.downloadUpdate() ?: return
+        val intent = viewModel.installUpdate() ?: return
         runCatching { startActivity(intent) }
-            .onFailure { viewModel.showMessage("Abrí la app Archivos → Descargas y tocá el archivo de Stocktin") }
     }
 
     companion object {
@@ -145,7 +144,7 @@ private fun App(viewModel: MainViewModel, onUpdate: () -> Unit) {
                     if (release.notes.isEmpty()) Text("Se instala encima, sin perder tus listas.")
                 }
             },
-            confirmButton = { TextButton(onClick = onUpdate) { Text("Descargar") } },
+            confirmButton = { TextButton(onClick = onUpdate) { Text("Actualizar") } },
             dismissButton = { TextButton(onClick = viewModel::dismissUpdateDialog) { Text("Ahora no") } },
         )
     }

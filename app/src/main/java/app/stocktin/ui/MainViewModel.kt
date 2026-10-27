@@ -47,8 +47,8 @@ sealed interface UpdateState {
     data class Available(override val release: Release) : UpdateState
     /** Bajando el APK; [progress] es null mientras no se sabe el tamaño. */
     data class Downloading(override val release: Release, val progress: Float?) : UpdateState
-    /** Descargada: falta tocar la notificación de la descarga para instalarla. */
-    data class Downloaded(override val release: Release) : UpdateState
+    /** Bajada: Android está mostrando "¿Actualizar Stocktin?". */
+    data class Installing(override val release: Release) : UpdateState
 }
 
 /** Un aviso abajo de la pantalla, con un botón opcional (por ejemplo, Deshacer). */
@@ -174,6 +174,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Al volver a la app se actualiza enseguida, sin esperar la próxima vuelta del ciclo. */
     fun setForeground(visible: Boolean) {
         foreground = visible
+        // Si se volvió del instalador sin actualizar (se canceló), se puede volver a intentar.
+        val state = _update.value
+        if (visible && state is UpdateState.Installing) _update.value = UpdateState.Available(state.release)
         if (visible && System.currentTimeMillis() - lastAttempt > LIVE_REFRESH_MS) {
             refresh(quiet = true)
             if (_tab.value == Tab.MARKETS) refreshMarkets()
@@ -185,10 +188,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     init {
         RefreshScheduler.schedule(app)
         afterUpdate()
-        if (settings.downloadId >= 0 ||
-            (settings.autoCheckUpdates && System.currentTimeMillis() - settings.lastUpdateCheck > UPDATE_CHECK_INTERVAL_MS)
-        ) {
-            // También si había una descarga empezada: se busca la versión para seguir mostrándola.
+        if (settings.autoCheckUpdates && System.currentTimeMillis() - settings.lastUpdateCheck > UPDATE_CHECK_INTERVAL_MS) {
             checkForUpdates(manual = false)
         }
         // Con la app a la vista, los precios se actualizan solos cada medio minuto.
@@ -462,9 +462,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     _lastUpdateCheck.value = settings.lastUpdateCheck
                     when {
                         release == null -> if (manual) showMessage("Ya tenés la última versión")
-                        // Ya se estaba bajando o ya se bajó: se retoma.
-                        settings.downloadId >= 0 && settings.downloadVersion == release.versionCode ->
-                            watchDownload(release, settings.downloadId)
                         else -> {
                             _update.value = UpdateState.Available(release)
                             if (!manual) _updateDialog.value = true
@@ -477,56 +474,35 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Baja la versión nueva dentro de la app. Devuelve qué abrir: la lista de descargas si ya está
-     * bajada, el navegador si el administrador de descargas no anda, o nada mientras baja.
+     * Baja la versión nueva y se la pasa al instalador de Android. Devuelve qué abrir antes: el
+     * permiso para instalar apps la primera vez, o el navegador si la descarga falla de entrada.
      */
-    fun downloadUpdate(): android.content.Intent? {
-        val state = _update.value ?: return null
+    fun installUpdate(): android.content.Intent? {
+        val state = _update.value as? UpdateState.Available ?: return null
         _updateDialog.value = false
-        when (state) {
-            is UpdateState.Downloaded -> return updater.downloadsIntent()
-            is UpdateState.Downloading -> return null
-            is UpdateState.Available -> Unit
+        if (!updater.canInstall()) {
+            showMessage("Permití que Stocktin instale apps y volvé a tocar Actualizar")
+            return updater.installPermissionIntent()
         }
-        val id = runCatching { updater.startDownload(state.release) }.getOrElse { return updater.browserIntent(state.release) }
-        settings.downloadId = id
-        settings.downloadVersion = state.release.versionCode
-        watchDownload(state.release, id)
-        return null
-    }
-
-    /** Sigue la descarga [id] hasta que termina, mostrando el avance. */
-    private fun watchDownload(release: Release, id: Long) {
-        downloadJob?.cancel()
-        downloadJob = viewModelScope.launch {
-            while (isActive) {
-                val progress = runCatching { updater.progress(id) }.getOrNull()
-                when {
-                    progress == null || progress.failed -> {
-                        settings.downloadId = -1
-                        _update.value = UpdateState.Available(release)
-                        showMessage("No se pudo descargar la actualización. Probá de nuevo.")
-                        return@launch
-                    }
-                    progress.done -> {
-                        _update.value = UpdateState.Downloaded(release)
-                        showMessage("Lista: tocá la notificación de la descarga para instalarla")
-                        return@launch
-                    }
-                    else -> _update.value = UpdateState.Downloading(release, progress.fraction)
-                }
-                delay(400)
+        val release = state.release
+        viewModelScope.launch {
+            _update.value = UpdateState.Downloading(release, null)
+            runCatching {
+                val apk = updater.download(release) { p -> _update.value = UpdateState.Downloading(release, p) }
+                _update.value = UpdateState.Installing(release)
+                updater.install(apk)
+            }.onFailure {
+                _update.value = UpdateState.Available(release)
+                showMessage("No se pudo descargar la actualización. Revisá la conexión y probá de nuevo.")
             }
         }
+        return null
     }
 
     /** Después de actualizar: borra el APK bajado y prepara las novedades de esta versión. */
     private fun afterUpdate() {
         val installed = runCatching { updater.installedVersionCode }.getOrDefault(0)
-        if (settings.downloadId >= 0 && settings.downloadVersion <= installed) {
-            updater.removeDownload(settings.downloadId)
-            settings.downloadId = -1
-        }
+        updater.clearDownloads()
         val seen = settings.lastSeenVersion
         if (seen == 0) {
             // Primera vez que se abre: no hay novedades que mostrar.
