@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Pantalla de inicio de Android 12+: el ícono sobre el verde de la marca. -->
+    <style name="Theme.Stocktin" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowSplashScreenBackground">#FF0E7C5A</item>
+    </style>
+</resources>

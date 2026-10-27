@@ -9,7 +9,11 @@ import androidx.compose.ui.draw.clip
 import app.stocktin.data.Quote
 import app.stocktin.data.STRIP_SYMBOLS
 import app.stocktin.data.SortMode
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.res.painterResource
+import app.stocktin.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -121,7 +125,14 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
             LargeTopAppBar(
                 title = {
                     Column {
-                        Text("Stocktin", fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Image(
+                                painterResource(R.drawable.ic_logo),
+                                contentDescription = null,
+                                modifier = Modifier.padding(end = 10.dp).size(32.dp),
+                            )
+                            Text("Stocktin", fontWeight = FontWeight.Bold)
+                        }
                         Text(
                             todayLabel().replaceFirstChar { it.uppercase() },
                             style = MaterialTheme.typography.bodyMedium,

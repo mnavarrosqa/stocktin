@@ -94,6 +94,32 @@ class WidgetScreenshotTest {
         TickerWidget().Content(symbol, rows.toMap()[symbol], WidgetPalette.of(theme), pill = false, showValue = false)
     }
 
+    /** El ícono de la app en las máscaras de los launchers, sobre el fondo de pantalla. */
+    @Test
+    fun appIcon() {
+        val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
+        val density = activity.resources.displayMetrics.density
+        val row = android.widget.LinearLayout(activity).apply {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFF3B5BDB.toInt(), 0xFF7048E8.toInt(), 0xFFE64980.toInt()),
+            )
+            val pad = (20 * density).toInt()
+            setPadding(pad, pad, pad, pad)
+        }
+        val icon = activity.packageManager.getApplicationIcon(activity.packageName)
+        listOf(96, 64, 48).forEach { dp ->
+            val view = android.widget.ImageView(activity).apply { setImageDrawable(icon) }
+            val px = (dp * density).toInt()
+            row.addView(view, android.widget.LinearLayout.LayoutParams(px, px).apply { marginEnd = (16 * density).toInt() })
+        }
+        val logo = android.widget.ImageView(activity).apply { setImageResource(app.stocktin.R.drawable.ic_logo) }
+        row.addView(logo, android.widget.LinearLayout.LayoutParams((48 * density).toInt(), (48 * density).toInt()))
+        activity.setContentView(row, ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        repeat(3) { ShadowLooper.idleMainLooper() }
+        row.captureRoboImage("screenshots/widgets/00_icono.png")
+    }
+
     @Test fun list4x4() = render("01_lista_4x5", 340.dp, 560.dp) { ListWidget(WidgetTheme.DYNAMIC, count = 9) }
 
     @Test
