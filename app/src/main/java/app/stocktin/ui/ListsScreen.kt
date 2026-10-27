@@ -21,6 +21,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -83,6 +88,32 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
     var confirmDelete by remember { mutableStateOf(false) }
     val snackbar = rememberMessages(viewModel)
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val haptics = LocalHapticFeedback.current
+
+    // Orden que se ve: el de la lista o el elegido en "Ordenar". Mientras se arrastra una fila, el
+    // orden vive acá y se guarda recién al soltarla.
+    val sorted = if (editing) list.symbols else sortMode.apply(list.symbols, quotes)
+    var dragOrder by remember(list.id) { mutableStateOf<List<String>?>(null) }
+    val shown = dragOrder ?: sorted
+    val listState = rememberLazyListState()
+    val reorder = rememberReorderableLazyListState(listState) { from, to ->
+        val current = dragOrder ?: sorted
+        val fromIndex = current.indexOfFirst { it == from.key }
+        val toIndex = current.indexOfFirst { it == to.key }
+        // Solo entre símbolos: la tira, los chips y el resumen de arriba no se mueven.
+        if (fromIndex >= 0 && toIndex >= 0) {
+            dragOrder = current.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
+    val onDragStarted: () -> Unit = {
+        dragOrder = shown
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+    val onDragStopped: () -> Unit = {
+        dragOrder?.let { if (it != sorted) viewModel.setOrder(it) }
+        dragOrder = null
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
@@ -138,7 +169,7 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
             onRefresh = { viewModel.refresh() },
             modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
         ) {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomPadding + 16.dp)) {
+            LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = bottomPadding + 16.dp)) {
                 item(key = "strip") {
                     MarketStrip(quotes) { viewModel.open(Screen.Detail(it)) }
                 }
@@ -177,7 +208,7 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                     }
                     Summary(
                         quotes = listQuotes,
-                        status = if (editing) "Ordená con las flechas o quitá símbolos" else status,
+                        status = if (editing) "Arrastrá ≡ para ordenar o tocá el tacho para quitar" else status,
                         sortMode = sortMode,
                         onSort = viewModel::setSortMode,
                         showSort = !editing && list.symbols.size > 1,
@@ -199,22 +230,25 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                         }
                     }
                 }
-                // Ordenando a mano se ve el orden propio de la lista.
-                val shown = if (editing) list.symbols else sortMode.apply(list.symbols, quotes)
                 items(shown, key = { it }) { symbol ->
-                    Box(Modifier.animateItem()) {
-                        SwipeToRemove(enabled = !editing, onRemove = { viewModel.removeSymbol(symbol) }) {
+                    ReorderableItem(reorder, key = symbol) { dragging ->
+                        SwipeToRemove(enabled = !editing && !dragging, onRemove = { viewModel.removeSymbol(symbol) }) {
                             QuoteRow(
                                 symbol = symbol,
                                 quote = quotes[symbol],
                                 showValue = showValue,
                                 selected = symbol == selectedSymbol,
                                 editing = editing,
+                                dragging = dragging,
                                 onClick = { viewModel.open(Screen.Detail(symbol)) },
-                                onLongClick = { editing = true },
                                 onToggleValue = { viewModel.setShowValue(!showValue) },
-                                onMove = { viewModel.moveSymbol(symbol, it) },
                                 onRemove = { viewModel.removeSymbol(symbol) },
+                                dragModifier = if (editing) {
+                                    Modifier
+                                } else {
+                                    Modifier.longPressDraggableHandle(onDragStarted = { onDragStarted() }, onDragStopped = { onDragStopped() })
+                                },
+                                handleModifier = Modifier.draggableHandle(onDragStarted = { onDragStarted() }, onDragStopped = { onDragStopped() }),
                             )
                         }
                     }

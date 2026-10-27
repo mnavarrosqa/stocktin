@@ -86,6 +86,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
+    implementation(libs.reorderable)
 
     testImplementation(libs.junit)
     // org.json de verdad: el de android.jar en los tests locales es solo un esqueleto.

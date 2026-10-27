@@ -17,6 +17,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
@@ -84,41 +85,46 @@ class WatchlistWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = Repository.get(context)
         provideContent {
-            val prefs = currentState<Preferences>()
-            val lists by repository.lists.collectAsState()
-            val quotes by repository.quotes.collectAsState()
-            val refreshing by repository.refreshing.collectAsState()
-            val lastRefresh by repository.lastRefresh.collectAsState()
-            val error by repository.lastError.collectAsState()
-            val list = lists.firstOrNull { it.id == prefs[WidgetKeys.LIST_ID] } ?: lists.firstOrNull()
-            val options = RowOptions(
-                palette = WidgetPalette.of(WidgetTheme.from(prefs[WidgetKeys.THEME])),
-                showSpark = prefs[WidgetKeys.SHOW_SPARK] ?: true,
-                showName = prefs[WidgetKeys.SHOW_NAME] ?: true,
-                pill = prefs[WidgetKeys.PILL] ?: false,
-                showExt = prefs[WidgetKeys.SHOW_EXT] ?: true,
-                showValue = prefs[WidgetKeys.SHOW_VALUE] ?: false,
-            )
-            val rows = list?.symbols.orEmpty().map { symbol -> symbol to quotes[symbol] }
-            val status = when {
-                refreshing -> "Actualizando…"
-                lastRefresh == 0L -> "Tocá ↻ para actualizar"
-                error != null -> "Sin conexión · ${Format.time(lastRefresh)}"
-                else -> Format.time(lastRefresh)
-            }
-            Content(
-                title = list?.name ?: "Stocktin",
-                status = status,
-                market = marketLabel(rows.mapNotNull { it.second }),
-                rows = rows,
-                layout = WidgetLayout.from(prefs[WidgetKeys.LAYOUT]),
-                options = options,
-            )
+            GlanceTheme { Widget(repository) }
         }
     }
 
     @Composable
-    private fun Content(
+    private fun Widget(repository: Repository) {
+        val prefs = currentState<Preferences>()
+        val lists by repository.lists.collectAsState()
+        val quotes by repository.quotes.collectAsState()
+        val refreshing by repository.refreshing.collectAsState()
+        val lastRefresh by repository.lastRefresh.collectAsState()
+        val error by repository.lastError.collectAsState()
+        val list = lists.firstOrNull { it.id == prefs[WidgetKeys.LIST_ID] } ?: lists.firstOrNull()
+        val options = RowOptions(
+            palette = WidgetPalette.of(WidgetTheme.from(prefs[WidgetKeys.THEME])),
+            showSpark = prefs[WidgetKeys.SHOW_SPARK] ?: true,
+            showName = prefs[WidgetKeys.SHOW_NAME] ?: true,
+            pill = prefs[WidgetKeys.PILL] ?: false,
+            showExt = prefs[WidgetKeys.SHOW_EXT] ?: true,
+            showValue = prefs[WidgetKeys.SHOW_VALUE] ?: false,
+        )
+        val rows = list?.symbols.orEmpty().map { symbol -> symbol to quotes[symbol] }
+        val status = when {
+            refreshing -> "Actualizando…"
+            lastRefresh == 0L -> "Tocá ↻ para actualizar"
+            error != null -> "Sin conexión · ${Format.time(lastRefresh)}"
+            else -> Format.time(lastRefresh)
+        }
+        Content(
+            title = list?.name ?: "Stocktin",
+            status = status,
+            market = marketLabel(rows.mapNotNull { it.second }),
+            rows = rows,
+            layout = WidgetLayout.from(prefs[WidgetKeys.LAYOUT]),
+            options = options,
+        )
+    }
+
+    @Composable
+    fun Content(
         title: String,
         status: String,
         market: Pair<String, Boolean>?,
@@ -385,7 +391,7 @@ class WatchlistWidget : GlanceAppWidget() {
         }
     }
 
-    private data class RowOptions(
+    data class RowOptions(
         val palette: WidgetPalette,
         val showSpark: Boolean,
         val showName: Boolean,

@@ -84,6 +84,13 @@ class Repository private constructor(context: Context) {
     fun addSymbol(listId: String, symbol: String) =
         editList(listId) { if (symbol in it.symbols) it else it.copy(symbols = it.symbols + symbol) }
 
+    /** Deja los símbolos de la lista en el orden de [symbols] (después de arrastrar y soltar). */
+    fun setOrder(listId: String, symbols: List<String>) = editList(listId) { list ->
+        // Por las dudas, se conservan los que no vinieron y se descartan los que no estaban.
+        val ordered = symbols.filter { it in list.symbols }
+        list.copy(symbols = ordered + list.symbols.filterNot { it in ordered })
+    }
+
     /** Vuelve a poner [symbol] en el lugar [index] (para deshacer un borrado). */
     fun insertSymbol(listId: String, symbol: String, index: Int) = editList(listId) {
         if (symbol in it.symbols) it else it.copy(symbols = it.symbols.toMutableList().apply { add(index.coerceIn(0, size), symbol) })

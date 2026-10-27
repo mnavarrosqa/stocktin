@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.GlanceTheme
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -46,33 +47,41 @@ class TickerWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repository = Repository.get(context)
         provideContent {
-            val prefs = currentState<Preferences>()
-            val quotes by repository.quotes.collectAsState()
-            val symbol = prefs[WidgetKeys.SYMBOL] ?: repository.allSymbols().firstOrNull() ?: "SPY"
-            val quote = quotes[symbol]
-            val p = WidgetPalette.of(WidgetTheme.from(prefs[WidgetKeys.THEME]))
-            val pill = prefs[WidgetKeys.PILL] ?: false
-            val showValue = prefs[WidgetKeys.SHOW_VALUE] ?: false
-            val size = LocalSize.current
+            GlanceTheme {
+                val prefs = currentState<Preferences>()
+                val quotes by repository.quotes.collectAsState()
+                val symbol = prefs[WidgetKeys.SYMBOL] ?: repository.allSymbols().firstOrNull() ?: "SPY"
+                Content(
+                    symbol = symbol,
+                    quote = quotes[symbol],
+                    p = WidgetPalette.of(WidgetTheme.from(prefs[WidgetKeys.THEME])),
+                    pill = prefs[WidgetKeys.PILL] ?: false,
+                    showValue = prefs[WidgetKeys.SHOW_VALUE] ?: false,
+                )
+            }
+        }
+    }
 
-            Column(
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .appWidgetBackground()
-                    .widgetCorners()
-                    .background(p.background)
-                    .padding(if (size.width < 110.dp) 8.dp else 12.dp)
-                    .clickable(openSymbol(symbol)),
-            ) {
-                when {
-                    quote == null -> {
-                        Text(symbol, maxLines = 1, style = TextStyle(color = p.text, fontSize = 15.sp, fontWeight = FontWeight.Bold))
-                        Text("Sin datos todavía", style = TextStyle(color = p.secondary, fontSize = 12.sp))
-                    }
-                    size.width < 120.dp || size.height < 80.dp -> Tiny(symbol, quote, p, showValue)
-                    size.height < 130.dp && size.width >= 200.dp -> WideRow(symbol, quote, p, pill, showValue)
-                    else -> Full(symbol, quote, p, pill, showValue)
+    @Composable
+    fun Content(symbol: String, quote: Quote?, p: WidgetPalette, pill: Boolean, showValue: Boolean) {
+        val size = LocalSize.current
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .appWidgetBackground()
+                .widgetCorners()
+                .background(p.background)
+                .padding(if (size.width < 110.dp) 8.dp else 12.dp)
+                .clickable(openSymbol(symbol)),
+        ) {
+            when {
+                quote == null -> {
+                    Text(symbol, maxLines = 1, style = TextStyle(color = p.text, fontSize = 15.sp, fontWeight = FontWeight.Bold))
+                    Text("Sin datos todavía", style = TextStyle(color = p.secondary, fontSize = 12.sp))
                 }
+                size.width < 120.dp || size.height < 80.dp -> Tiny(symbol, quote, p, showValue)
+                size.height < 130.dp && size.width >= 200.dp -> WideRow(symbol, quote, p, pill, showValue)
+                else -> Full(symbol, quote, p, pill, showValue)
             }
         }
     }

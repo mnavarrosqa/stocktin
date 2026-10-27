@@ -270,6 +270,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         widgetsChanged()
     }
 
+    /** Nuevo orden de la lista actual, arrastrando y soltando: pasa a orden personalizado. */
+    fun setOrder(symbols: List<String>) {
+        repository.setOrder(_currentList.value, symbols)
+        setSortMode(SortMode.CUSTOM)
+        widgetsChanged()
+    }
+
     fun setSortMode(mode: SortMode) {
         settings.sortMode = mode.name
         _sortMode.value = mode

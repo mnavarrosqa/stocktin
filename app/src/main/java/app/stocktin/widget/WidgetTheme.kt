@@ -1,6 +1,8 @@
 package app.stocktin.widget
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.glance.GlanceTheme
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.color.ColorProvider as DayNight
@@ -27,6 +29,8 @@ object WidgetKeys {
 
 /** Aspecto del widget. */
 enum class WidgetTheme(val label: String) {
+    /** Los colores del fondo de pantalla (Android 12+), como los widgets de Google. */
+    DYNAMIC("Material You"),
     SYSTEM("Automático"),
     LIGHT("Claro"),
     DARK("Oscuro"),
@@ -34,7 +38,7 @@ enum class WidgetTheme(val label: String) {
     GLASS("Transparente");
 
     companion object {
-        fun from(key: String?) = entries.firstOrNull { it.name == key } ?: SYSTEM
+        fun from(key: String?) = entries.firstOrNull { it.name == key } ?: DYNAMIC
     }
 }
 
@@ -67,7 +71,22 @@ class WidgetPalette(
         private val black = dark.copy(background = Color(0xFF000000), divider = Color(0xFF1F2226))
         private val glass = dark.copy(background = Color(0x8C000000), divider = Color(0x33FFFFFF), secondary = Color(0xFFC9CED6))
 
+        /** Los colores de [theme]; Material You los toma de [GlanceTheme] (hay que estar adentro de él). */
+        @Composable
         fun of(theme: WidgetTheme): WidgetPalette = when (theme) {
+            WidgetTheme.DYNAMIC -> GlanceTheme.colors.let { c ->
+                WidgetPalette(
+                    background = c.widgetBackground,
+                    text = c.onSurface,
+                    secondary = c.onSurfaceVariant,
+                    divider = c.surfaceVariant,
+                    up = DayNight(light.up, dark.up),
+                    down = DayNight(light.down, dark.down),
+                    upPill = DayNight(Color(0xFF16A34A), Color(0xFF1F9D55)),
+                    downPill = DayNight(Color(0xFFE5484D), Color(0xFFD9363E)),
+                    onPill = ColorProvider(Color.White),
+                )
+            }
             WidgetTheme.SYSTEM -> WidgetPalette(
                 background = DayNight(light.background, dark.background),
                 text = DayNight(light.text, dark.text),

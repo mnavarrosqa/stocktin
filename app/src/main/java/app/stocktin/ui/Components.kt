@@ -13,9 +13,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,8 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -144,7 +144,6 @@ private fun TabPill(tab: Tab, selected: Boolean, onClick: () -> Unit) {
 }
 
 /** Fila de una lista: símbolo y nombre, minigráfico, precio y cambio. */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun QuoteRow(
     symbol: String,
@@ -152,24 +151,34 @@ fun QuoteRow(
     showValue: Boolean,
     selected: Boolean,
     editing: Boolean,
+    dragging: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
     onToggleValue: () -> Unit,
-    onMove: (Int) -> Unit,
     onRemove: () -> Unit,
+    /** Mantener presionada la fila y arrastrar para moverla. */
+    dragModifier: Modifier = Modifier,
+    /** La manija ≡ del modo edición: arrastra sin esperar. */
+    handleModifier: Modifier = Modifier,
 ) {
     val background by animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+        when {
+            dragging -> MaterialTheme.colorScheme.surfaceContainerHigh
+            selected -> MaterialTheme.colorScheme.secondaryContainer
+            else -> MaterialTheme.colorScheme.surface
+        },
         label = "rowBackground",
     )
+    val elevation by animateDpAsState(if (dragging) 8.dp else 0.dp, label = "rowElevation")
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 8.dp)
+            .shadow(elevation, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
             .background(background)
-            .combinedClickable(enabled = !editing, onClick = onClick, onLongClick = onLongClick)
+            .then(dragModifier)
+            .clickable(enabled = !editing, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -188,9 +197,13 @@ fun QuoteRow(
             }
         }
         if (editing) {
-            IconButton(onClick = { onMove(-1) }) { Icon(Icons.Filled.KeyboardArrowUp, "Subir") }
-            IconButton(onClick = { onMove(1) }) { Icon(Icons.Filled.KeyboardArrowDown, "Bajar") }
-            IconButton(onClick = onRemove) { Icon(Icons.Filled.Delete, "Quitar") }
+            IconButton(onClick = onRemove) { Icon(Icons.Filled.Delete, "Quitar", tint = MaterialTheme.colorScheme.error) }
+            Icon(
+                Icons.Filled.Menu,
+                contentDescription = "Arrastrar para mover",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = handleModifier.padding(12.dp),
+            )
             return@Row
         }
         if (quote == null) {
