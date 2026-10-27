@@ -226,7 +226,19 @@ class WatchlistWidget(
     @Composable
     private fun QuoteList(rows: List<Pair<String, Quote?>>, width: Dp, height: Dp, options: RowOptions) {
         val columns = if (width >= 460.dp) 2 else 1
-        val density = RowDensity.of(width / columns - if (columns > 1) 12.dp else 0.dp)
+        val rowWidth = width / columns - if (columns > 1) 12.dp else 0.dp
+        val density = RowDensity.of(rowWidth)
+        // La columna de precios mide lo que el precio más largo (siguen alineados, sin espacio de más)
+        // y el minigráfico se estira con lo que sobra entre el nombre y el precio.
+        val big = density >= RowDensity.MEDIUM
+        // Con la letra del sistema más grande, los números ocupan más.
+        val fontScale = LocalContext.current.resources.configuration.fontScale
+        val priceColumn = priceColumnWidth(rows.mapNotNull { it.second }, big, options, fontScale)
+        val sparkWidth = if (density >= RowDensity.WIDE && options.showSpark) {
+            ((rowWidth - priceColumn - 20.dp) * 0.42f).coerceIn(48.dp, 150.dp)
+        } else {
+            0.dp
+        }
         val lines = ceil(rows.size / columns.toDouble()).toInt()
         val fill = lines <= 10 && density.minHeight * lines <= height
         val last = rows.chunked(columns).lastOrNull().orEmpty().map { it.first }.toSet()
@@ -239,7 +251,7 @@ class WatchlistWidget(
                     modifier = if (fill) GlanceModifier.fillMaxWidth().defaultWeight() else GlanceModifier.fillMaxWidth(),
                     contentAlignment = Alignment.CenterStart,
                 ) {
-                    QuoteRow(symbol, quote, density, options)
+                    QuoteRow(symbol, quote, density, options, priceColumn, sparkWidth)
                 }
                 if (symbol !in last) {
                     Spacer(GlanceModifier.fillMaxWidth().height(1.dp).background(options.palette.divider))
@@ -277,6 +289,28 @@ class WatchlistWidget(
         }
     }
 
+    /**
+     * Ancho aproximado de la columna de precios: el del precio o el cambio más largo de la lista.
+     * Glance no mide texto, así que se estima por caracteres (los dígitos de Roboto miden ~0.57 em).
+     */
+    private fun priceColumnWidth(quotes: List<Quote>, big: Boolean, options: RowOptions, fontScale: Float): Dp {
+        fun width(text: String, sp: Float): Float = text.sumOf { ch ->
+            when (ch) {
+                ',', '.' -> 0.28
+                '%' -> 0.85
+                '+', '-' -> 0.6
+                else -> 0.58
+            }
+        }.toFloat() * sp
+        val priceSp = if (big) 16f else 14f
+        val changeSp = if (big) 13f else 12f
+        val widest = quotes.maxOfOrNull { q ->
+            val change = if (options.showValue) Format.change(q.change) else Format.percent(q.changePercent)
+            maxOf(width(Format.price(q.price), priceSp), width(change, changeSp) + if (options.pill) 14f else 0f)
+        } ?: 60f
+        return (widest * fontScale + 6f).dp.coerceIn(52.dp, 150.dp)
+    }
+
     /** Cuánto entra en cada fila según su ancho. */
     private enum class RowDensity(val minHeight: Dp) {
         /** Símbolo y cambio arriba, precio abajo. */
@@ -307,7 +341,14 @@ class WatchlistWidget(
      * nombre tenga lugar.
      */
     @Composable
-    private fun QuoteRow(symbol: String, quote: Quote?, density: RowDensity, options: RowOptions) {
+    private fun QuoteRow(
+        symbol: String,
+        quote: Quote?,
+        density: RowDensity,
+        options: RowOptions,
+        priceColumn: Dp,
+        sparkWidth: Dp,
+    ) {
         val p = options.palette
         val open = openSymbol(symbol)
         if (density == RowDensity.TINY) {
@@ -348,11 +389,6 @@ class WatchlistWidget(
                     Text(quote.name, maxLines = 1, style = TextStyle(color = p.secondary, fontSize = if (big) 12.sp else 11.sp))
                 }
             }
-            val sparkWidth = when (density) {
-                RowDensity.WIDE -> 56.dp
-                RowDensity.XWIDE -> 72.dp
-                else -> 0.dp
-            }
             if (options.showSpark && sparkWidth > 0.dp && quote != null) {
                 Spacer(GlanceModifier.width(8.dp))
                 SparkImage(quote, sparkWidth, 28.dp)
@@ -364,7 +400,7 @@ class WatchlistWidget(
             }
             // Columna de ancho fijo: los minigráficos y los precios quedan alineados.
             Column(
-                modifier = GlanceModifier.width(if (big) 96.dp else 78.dp),
+                modifier = GlanceModifier.width(priceColumn),
                 horizontalAlignment = Alignment.End,
             ) {
                 PriceText(quote, p, if (big) 16.sp else 14.sp)
