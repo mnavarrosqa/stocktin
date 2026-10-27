@@ -18,6 +18,7 @@ class Repository private constructor(context: Context) {
 
     private val listsFile = File(context.filesDir, "watchlists.json")
     private val quotesFile = File(context.filesDir, "quotes.json")
+    private val alertsFile = File(context.filesDir, "alerts.json")
     private val settings = Settings(context)
     private val refreshLock = Mutex()
 
@@ -26,6 +27,10 @@ class Repository private constructor(context: Context) {
 
     private val _quotes = MutableStateFlow(loadQuotes())
     val quotes: StateFlow<Map<String, Quote>> = _quotes.asStateFlow()
+
+    private val _alerts = MutableStateFlow(loadAlerts())
+    /** Alertas de precio que todavía no se cumplieron. */
+    val alerts: StateFlow<List<Alert>> = _alerts.asStateFlow()
 
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
@@ -118,6 +123,37 @@ class Repository private constructor(context: Context) {
         val to = (from + delta).coerceIn(0, lists.lastIndex)
         if (from < 0 || from == to) lists else lists.toMutableList().apply { add(to, removeAt(from)) }
     }
+
+    fun addAlert(symbol: String, target: Double, price: Double): Alert {
+        val alert = Alert(UUID.randomUUID().toString().take(8), symbol, target, above = target >= price, System.currentTimeMillis())
+        editAlerts { it + alert }
+        return alert
+    }
+
+    /** Vuelve a poner una alerta borrada (Deshacer). */
+    fun restoreAlert(alert: Alert) = editAlerts { alerts -> if (alerts.any { it.id == alert.id }) alerts else alerts + alert }
+
+    fun removeAlert(id: String) = editAlerts { alerts -> alerts.filterNot { it.id == id } }
+
+    /** Saca y devuelve las alertas que se cumplieron con las últimas cotizaciones. */
+    fun takeReachedAlerts(): List<Pair<Alert, Quote>> {
+        val reached = Alerts.reached(_alerts.value, _quotes.value)
+        if (reached.isNotEmpty()) {
+            val ids = reached.map { it.first.id }.toSet()
+            editAlerts { alerts -> alerts.filterNot { it.id in ids } }
+        }
+        return reached
+    }
+
+    @Synchronized
+    private fun editAlerts(change: (List<Alert>) -> List<Alert>) {
+        val updated = change(_alerts.value)
+        _alerts.value = updated
+        writeAtomically(alertsFile, Alerts.toJson(updated))
+    }
+
+    private fun loadAlerts(): List<Alert> =
+        runCatching { Alerts.fromJson(alertsFile.readText()) }.getOrDefault(emptyList())
 
     private fun editList(id: String, change: (Watchlist) -> Watchlist) =
         editLists { lists -> lists.map { if (it.id == id) change(it) else it } }

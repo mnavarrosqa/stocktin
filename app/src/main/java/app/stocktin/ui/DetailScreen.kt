@@ -30,6 +30,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -82,6 +85,9 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
     val state = chartState?.takeIf { it.symbol == symbol }
     var selected by remember(symbol, state?.range) { mutableStateOf<Int?>(null) }
     var listMenu by remember { mutableStateOf(false) }
+    var alertSheet by remember(symbol) { mutableStateOf(false) }
+    val allAlerts by viewModel.alerts.collectAsState()
+    val alerts = allAlerts.filter { it.symbol == symbol }
     val inAnyList = lists.any { symbol in it.symbols }
     val snackbar = rememberMessages(viewModel)
     val fold = rememberFoldingFeature()
@@ -104,6 +110,13 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 },
                 title = { Text(symbol, fontWeight = FontWeight.Bold) },
                 actions = {
+                    if (quote != null) {
+                        IconButton(onClick = { alertSheet = true }) {
+                            BadgedBox(badge = { if (alerts.isNotEmpty()) Badge { Text("${alerts.size}") } }) {
+                                Icon(Icons.Filled.Notifications, "Nueva alerta de precio")
+                            }
+                        }
+                    }
                     Box {
                         FilledTonalButton(onClick = { listMenu = true }, modifier = Modifier.padding(end = 8.dp)) {
                             Icon(if (inAnyList) Icons.Filled.Check else Icons.Filled.Add, null)
@@ -125,6 +138,9 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        if (alertSheet && quote != null) {
+            NewAlertSheet(symbol, quote.price, onCreate = { viewModel.addAlert(symbol, it) }, onDismiss = { alertSheet = false })
+        }
         if (quote == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             return@Scaffold
@@ -161,6 +177,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                         .verticalScroll(rememberScrollState()),
                 ) {
                     Stats(quote)
+                    AlertsBlock(alerts, quote.price, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                     News(viewModel, symbol)
                 }
             }
@@ -173,6 +190,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
             ) {
                 top(if (inPane) 320.dp else 260.dp)
                 Stats(quote)
+                AlertsBlock(alerts, quote.price, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                 News(viewModel, symbol)
                 Spacer(Modifier.height(24.dp))
             }

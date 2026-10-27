@@ -3,7 +3,9 @@ package app.stocktin.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.stocktin.data.Alert
 import app.stocktin.data.Chart
+import app.stocktin.data.Format
 import app.stocktin.data.ChartRange
 import app.stocktin.data.MARKET_SYMBOLS
 import app.stocktin.data.Movers
@@ -70,6 +72,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val lists = repository.lists
     val quotes = repository.quotes
+    val alerts = repository.alerts
     val refreshing = repository.refreshing
     val lastRefresh = repository.lastRefresh
     val lastError = repository.lastError
@@ -440,6 +443,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoCheckUpdates(enabled: Boolean) {
         settings.autoCheckUpdates = enabled
         _autoCheckUpdates.value = enabled
+    }
+
+    /** Crea una alerta para cuando [symbol] llegue a [target] (sube o baja según el precio de ahora). */
+    fun addAlert(symbol: String, target: Double) {
+        val price = repository.quotes.value[symbol]?.price ?: return
+        val alert = repository.addAlert(symbol, target, price)
+        showMessage("Te avisamos cuando $symbol ${if (alert.above) "suba" else "baje"} a ${Format.price(target)}")
+    }
+
+    fun removeAlert(alert: Alert) {
+        repository.removeAlert(alert.id)
+        _message.value = Message("Alerta de ${alert.symbol} borrada", "Deshacer") {
+            repository.restoreAlert(alert)
+        }
     }
 
     fun showMessage(text: String) {

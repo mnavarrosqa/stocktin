@@ -2,7 +2,9 @@ package app.stocktin.ui
 
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
+import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,6 +67,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.R
+import app.stocktin.alerts.AlertNotifier
+import app.stocktin.data.Alert
 import app.stocktin.data.Format
 import app.stocktin.update.Release
 import app.stocktin.update.Updater
@@ -98,6 +103,9 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val uri = LocalUriHandler.current
     var history by remember { mutableStateOf(false) }
+    val alerts by viewModel.alerts.collectAsState()
+    val quotes by viewModel.quotes.collectAsState()
+    val context = LocalContext.current
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
@@ -126,6 +134,24 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
 
             Section("Widgets") {
                 WidgetsRow()
+            }
+
+            Section("Alertas de precio") {
+                AlertsSection(
+                    alerts = alerts,
+                    prices = quotes.mapValues { it.value.price },
+                    manualRefresh = minutes == 0,
+                    canNotify = AlertNotifier.canNotify(context),
+                    onOpen = { viewModel.open(Screen.Detail(it)) },
+                    onRemove = viewModel::removeAlert,
+                    onNotificationSettings = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                            )
+                        }
+                    },
+                )
             }
 
             Section("Datos") {
@@ -233,6 +259,44 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
         ModalBottomSheet(onDismissRequest = { history = false }) {
             ReleaseHistory(releases, installedCode = Updater.versionCodeOf(viewModel.installedVersion) ?: 0)
         }
+    }
+}
+
+@Composable
+private fun AlertsSection(
+    alerts: List<Alert>,
+    prices: Map<String, Double>,
+    manualRefresh: Boolean,
+    canNotify: Boolean,
+    onOpen: (String) -> Unit,
+    onRemove: (Alert) -> Unit,
+    onNotificationSettings: () -> Unit,
+) {
+    if (!canNotify) {
+        LinkRow(Icons.Filled.Warning, "Las notificaciones están apagadas", "Activalas para que suenen las alertas", onNotificationSettings)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    }
+    if (alerts.isEmpty()) {
+        Text(
+            "Abrí un símbolo y tocá la campana para que te avisemos cuando llegue a un precio.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(16.dp),
+        )
+    } else {
+        Column(Modifier.padding(vertical = 4.dp)) {
+            alerts.sortedBy { it.symbol }.forEach { alert ->
+                AlertRow(alert, prices[alert.symbol], showSymbol = true, onRemove = { onRemove(alert) }, onClick = { onOpen(alert.symbol) })
+            }
+        }
+    }
+    if (manualRefresh && alerts.isNotEmpty()) {
+        Text(
+            "Con la actualización en \"Manual\", las alertas solo se revisan con la app abierta.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+        )
     }
 }
 

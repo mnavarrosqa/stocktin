@@ -67,6 +67,9 @@ búsqueda al lado.
 - **Ordenar** por mayor suba, mayor baja o símbolo, y **deslizar una fila** para quitarla (con
   Deshacer). Los precios destellan en verde o rojo cuando cambian.
 - La búsqueda muestra tus búsquedas recientes y lo más buscado del día en Yahoo Finance.
+- **Alertas de precio:** en el detalle, la campana → un precio (o ±5 % / ±10 %) y Stocktin avisa
+  con una notificación cuando lo alcanza. Se revisan cada vez que se actualizan los precios (con la
+  app abierta o en segundo plano), suenan una vez y se borran. En Ajustes están todas juntas.
 - El detalle trae las últimas **noticias** del símbolo y marca el máximo y el mínimo en el gráfico.
 - Con la app abierta los precios se actualizan cada 30 segundos.
 - Tocá la etiqueta de color para alternar entre porcentaje y dinero.

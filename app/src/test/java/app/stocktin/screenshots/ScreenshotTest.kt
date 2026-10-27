@@ -113,6 +113,16 @@ class ScreenshotTest {
     }
 
     @Test
+    fun alert() {
+        launch()
+        compose.onNodeWithText("NVDA").performClick()
+        settle()
+        compose.onNodeWithContentDescription("Nueva alerta de precio").performClick()
+        settle()
+        shot("04b_nueva_alerta")
+    }
+
+    @Test
     fun search() {
         launch()
         compose.onNodeWithContentDescription("Buscar").performClick()

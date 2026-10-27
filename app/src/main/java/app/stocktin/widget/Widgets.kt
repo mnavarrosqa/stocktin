@@ -19,6 +19,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import app.stocktin.alerts.AlertNotifier
 import app.stocktin.data.MarketHours
 import app.stocktin.data.Repository
 import app.stocktin.data.Settings
@@ -33,7 +34,7 @@ object Widgets {
         }
     }
 
-    /** Los símbolos de todas las listas más los de los widgets de un símbolo. */
+    /** Los símbolos de todas las listas, de los widgets de un símbolo y de las alertas. */
     suspend fun symbolsInUse(context: Context): List<String> {
         // Si no se pueden leer los widgets, igual se actualizan las listas.
         val tickers = runCatching {
@@ -41,12 +42,15 @@ object Widgets {
                 getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[WidgetKeys.SYMBOL]
             }
         }.getOrDefault(emptyList())
-        return (Repository.get(context).allSymbols() + tickers).distinct()
+        val repository = Repository.get(context)
+        return (repository.allSymbols() + tickers + repository.alerts.value.map { it.symbol }).distinct()
     }
 
-    /** Trae cotizaciones nuevas (más [extra], si se pide) y redibuja los widgets. */
+    /** Trae cotizaciones nuevas (más [extra], si se pide), avisa las alertas cumplidas y redibuja los widgets. */
     suspend fun refresh(context: Context, extra: List<String> = emptyList()): Result<Unit> {
-        val result = Repository.get(context).refresh((symbolsInUse(context) + extra).distinct())
+        val repository = Repository.get(context)
+        val result = repository.refresh((symbolsInUse(context) + extra).distinct())
+        if (result.isSuccess) AlertNotifier.notify(context, repository.takeReachedAlerts())
         updateAll(context)
         return result
     }
