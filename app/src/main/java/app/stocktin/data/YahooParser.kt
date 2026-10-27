@@ -60,6 +60,13 @@ object YahooParser {
         return (0 until result.length()).mapNotNull { i -> result.optJSONObject(i)?.let(::quoteFrom) }
     }
 
+    /** Respuesta del buscador de Yahoo (`v1/finance/screener/predefined/saved`): las que más se movieron. */
+    fun parseScreener(body: String): List<Quote> {
+        val result = JSONObject(body).optJSONObject("finance")?.optJSONArray("result")?.optJSONObject(0)
+        val quotes = result?.optJSONArray("quotes") ?: return emptyList()
+        return (0 until quotes.length()).mapNotNull { i -> quotes.optJSONObject(i)?.let(::quoteFrom) }
+    }
+
     private fun quoteFrom(o: JSONObject): Quote? {
         val symbol = o.optStringOrNull("symbol") ?: return null
         val price = o.optDoubleOrNull("regularMarketPrice") ?: return null

@@ -96,6 +96,9 @@ class ScreenshotTest {
         compose.onNodeWithContentDescription("Mercados").performClick()
         settle()
         shot("03_mercados")
+        compose.onRoot().performTouchInput { swipeUp() }
+        settle()
+        shot("03b_mercados_abajo")
     }
 
     @Test

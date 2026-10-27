@@ -74,6 +74,18 @@ object YahooApi {
         YahooParser.parseNews(get("$HOST/v1/finance/search?q=$q&quotesCount=0&newsCount=8&listsCount=0"))
     }
 
+    /** Las acciones de EE.UU. que más suben, bajan o se operan hoy. */
+    suspend fun movers(kind: Movers, count: Int = 8): List<Quote> = withContext(Dispatchers.IO) {
+        val url = "$HOST/v1/finance/screener/predefined/saved?scrIds=${kind.screenerId}&count=$count&formatted=false"
+        val body = try {
+            get(url)
+        } catch (e: HttpException) {
+            // Algunas veces pide el crumb, como la cotización completa.
+            get(url + "&crumb=" + URLEncoder.encode(crumb(), "UTF-8"))
+        }
+        YahooParser.parseScreener(body)
+    }
+
     /** Lo más buscado hoy en Yahoo Finance (EE.UU.). */
     suspend fun trending(): List<String> = withContext(Dispatchers.IO) {
         YahooParser.parseTrending(get("$HOST/v1/finance/trending/US?count=12"))

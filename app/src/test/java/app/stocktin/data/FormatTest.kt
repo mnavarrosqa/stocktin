@@ -49,4 +49,32 @@ class FormatTest {
         )
         assertEquals(listOf(quote), Storage.quotesFromJson(Storage.quotesToJson(listOf(quote))))
     }
+
+    @Test
+    fun `cuanto falta para que abra o cierre wall street`() {
+        val ny = ZoneId.of("America/New_York")
+        // Martes 11:00: abierto, cierra a las 16:00.
+        val open = MarketHours.status(ZonedDateTime.of(2026, 10, 27, 11, 0, 0, 0, ny))
+        assertEquals(MarketHours.Phase.OPEN, open.phase)
+        assertEquals(16, open.next.hour)
+        // Martes 8:00: pre-apertura, abre hoy 9:30.
+        val pre = MarketHours.status(ZonedDateTime.of(2026, 10, 27, 8, 0, 0, 0, ny))
+        assertEquals(MarketHours.Phase.PRE, pre.phase)
+        assertEquals(27, pre.next.dayOfMonth)
+        assertEquals(9, pre.next.hour)
+        // Viernes 21:00: cerrado, abre el lunes.
+        val friday = MarketHours.status(ZonedDateTime.of(2026, 10, 30, 21, 0, 0, 0, ny))
+        assertEquals(MarketHours.Phase.CLOSED, friday.phase)
+        assertEquals(java.time.DayOfWeek.MONDAY, friday.next.dayOfWeek)
+        assertEquals("3 h 12 min", MarketHours.countdown(open.next.minusMinutes(192), open.next))
+        assertEquals("45 min", MarketHours.countdown(open.next.minusMinutes(45), open.next))
+    }
+
+    @Test
+    fun `screener de yahoo`() {
+        val json = """{"finance":{"result":[{"quotes":[{"symbol":"ABC","shortName":"Abc Inc","regularMarketPrice":10.5,"regularMarketChangePercent":12.3,"regularMarketChange":1.15}]}]}}"""
+        val q = YahooParser.parseScreener(json).single()
+        assertEquals("ABC", q.symbol)
+        assertEquals(12.3, q.changePercent, 1e-9)
+    }
 }

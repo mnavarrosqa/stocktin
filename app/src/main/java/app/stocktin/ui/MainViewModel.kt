@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import app.stocktin.data.Chart
 import app.stocktin.data.ChartRange
 import app.stocktin.data.MARKET_SYMBOLS
+import app.stocktin.data.Movers
+import app.stocktin.data.Quote
 import app.stocktin.data.STRIP_SYMBOLS
 import app.stocktin.data.NewsItem
 import app.stocktin.data.SortMode
@@ -148,6 +150,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val news: StateFlow<Pair<String, List<NewsItem>?>?> = _news.asStateFlow()
     private var newsJob: Job? = null
 
+    /** Las que más suben, bajan o se operan hoy (vacío mientras cargan). */
+    private val _movers = MutableStateFlow<Map<Movers, List<Quote>>>(emptyMap())
+    val movers: StateFlow<Map<Movers, List<Quote>>> = _movers.asStateFlow()
+
+    private val _moversKind = MutableStateFlow(Movers.GAINERS)
+    val moversKind: StateFlow<Movers> = _moversKind.asStateFlow()
+
+    /** La hora, para las cuentas regresivas (se renueva cada pocos segundos). */
+    private val _now = MutableStateFlow(System.currentTimeMillis())
+    val now: StateFlow<Long> = _now.asStateFlow()
+
     private val _trending = MutableStateFlow<List<String>>(emptyList())
     val trending: StateFlow<List<String>> = _trending.asStateFlow()
 
@@ -185,6 +198,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     refresh(quiet = true)
                     if (_tab.value == Tab.MARKETS) refreshMarkets()
                 }
+                _now.value = System.currentTimeMillis()
                 delay(5_000)
             }
         }
@@ -200,6 +214,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshMarkets() {
         viewModelScope.launch { repository.refresh(MARKET_SYMBOLS) }
+        loadMovers(_moversKind.value)
+    }
+
+    fun setMoversKind(kind: Movers) {
+        _moversKind.value = kind
+        if (_movers.value[kind] == null) loadMovers(kind)
+    }
+
+    private fun loadMovers(kind: Movers) {
+        viewModelScope.launch {
+            runCatching { YahooApi.movers(kind) }.onSuccess { list ->
+                _movers.update { it + (kind to list) }
+                repository.putQuotes(list)
+            }
+        }
     }
 
     // Navegación
@@ -207,7 +236,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun selectTab(tab: Tab) {
         _tab.value = tab
         _stack.value = emptyList()
-        if (tab == Tab.MARKETS && MARKET_SYMBOLS.any { repository.quotes.value[it] == null }) refreshMarkets()
+        if (tab == Tab.MARKETS && (MARKET_SYMBOLS.any { repository.quotes.value[it] == null } || _movers.value.isEmpty())) {
+            refreshMarkets()
+        }
     }
 
     fun open(screen: Screen) {

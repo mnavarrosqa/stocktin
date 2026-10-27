@@ -65,6 +65,13 @@ class Repository private constructor(context: Context) {
         }
     }
 
+    /** Guarda cotizaciones sin minigráfico (por ejemplo, de las que más se mueven) sin perder el que ya había. */
+    fun putQuotes(fresh: List<Quote>) {
+        if (fresh.isEmpty()) return
+        _quotes.update { old -> old + fresh.associate { q -> q.symbol to q.copy(spark = q.spark.ifEmpty { old[q.symbol]?.spark.orEmpty() }) } }
+        saveQuotes()
+    }
+
     /** Guarda una cotización que llegó por otro lado (por ejemplo, al abrir el detalle). */
     fun putQuote(quote: Quote) {
         _quotes.update { it + (quote.symbol to quote) }

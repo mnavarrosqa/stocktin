@@ -44,6 +44,7 @@ object FakeYahoo {
             param(url, "range"),
         )
         "/v1/finance/trending" in url -> trending()
+        "/v1/finance/screener" in url -> screener(param(url, "scrIds"))
         "/v1/finance/search" in url && "quotesCount=0" in url -> news(param(url, "q"))
         "/v1/finance/search" in url -> search(param(url, "q"))
         else -> throw IOException("Sin red en las capturas: $url")
@@ -131,6 +132,17 @@ object FakeYahoo {
             .put("timestamp", times)
             .put("indicators", JSONObject().put("quote", JSONArray().put(JSONObject().put("close", closes))))
         return JSONObject().put("chart", JSONObject().put("result", JSONArray().put(result))).toString()
+    }
+
+    /** Las que más se mueven: algunas inventadas, ordenadas como lo haría Yahoo. */
+    private fun screener(id: String): String {
+        val symbols = when (id) {
+            "day_gainers" -> listOf("NVDA", "MELI", "QQQ", "SPY")
+            "day_losers" -> listOf("TSLA", "AAPL", "^VIX")
+            else -> listOf("NVDA", "TSLA", "AAPL", "SPY", "QQQ")
+        }
+        val quotes = JSONObject(quotes(symbols)).getJSONObject("quoteResponse").getJSONArray("result")
+        return JSONObject().put("finance", JSONObject().put("result", JSONArray().put(JSONObject().put("quotes", quotes)))).toString()
     }
 
     private fun trending(): String {
