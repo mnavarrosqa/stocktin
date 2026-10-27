@@ -40,9 +40,9 @@ object Widgets {
         return (Repository.get(context).allSymbols() + tickers).distinct()
     }
 
-    /** Trae cotizaciones nuevas y redibuja los widgets. */
-    suspend fun refresh(context: Context): Result<Unit> {
-        val result = Repository.get(context).refresh(symbolsInUse(context))
+    /** Trae cotizaciones nuevas (más [extra], si se pide) y redibuja los widgets. */
+    suspend fun refresh(context: Context, extra: List<String> = emptyList()): Result<Unit> {
+        val result = Repository.get(context).refresh((symbolsInUse(context) + extra).distinct())
         updateAll(context)
         return result
     }

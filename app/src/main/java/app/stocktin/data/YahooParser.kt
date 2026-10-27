@@ -187,6 +187,38 @@ object YahooParser {
         }
     }
 
+    /** Noticias de `v1/finance/search` (con newsCount > 0). */
+    fun parseNews(body: String): List<NewsItem> {
+        val news = JSONObject(body).optJSONArray("news") ?: return emptyList()
+        return (0 until news.length()).mapNotNull { i ->
+            val o = news.optJSONObject(i) ?: return@mapNotNull null
+            val title = o.optStringOrNull("title") ?: return@mapNotNull null
+            val link = o.optStringOrNull("link") ?: return@mapNotNull null
+            // La miniatura más chica que tenga al menos 140 px de ancho.
+            val resolutions = o.optJSONObject("thumbnail")?.optJSONArray("resolutions")
+            val thumbnail = resolutions?.let { r ->
+                (0 until r.length()).mapNotNull { r.optJSONObject(it) }
+                    .filter { it.optInt("width") >= 140 }
+                    .minByOrNull { it.optInt("width") }
+                    ?.optStringOrNull("url")
+            }
+            NewsItem(
+                title = title,
+                publisher = o.optStringOrNull("publisher") ?: "",
+                link = link,
+                time = o.optLong("providerPublishTime"),
+                thumbnail = thumbnail,
+            )
+        }
+    }
+
+    /** Símbolos más buscados de `v1/finance/trending/{región}`. */
+    fun parseTrending(body: String): List<String> {
+        val result = JSONObject(body).optJSONObject("finance")?.optJSONArray("result")?.optJSONObject(0)
+        val quotes = result?.optJSONArray("quotes") ?: return emptyList()
+        return (0 until quotes.length()).mapNotNull { quotes.optJSONObject(it)?.optStringOrNull("symbol") }
+    }
+
     private fun JSONObject.optStringOrNull(key: String): String? =
         if (has(key) && !isNull(key)) optString(key).takeIf { it.isNotBlank() } else null
 

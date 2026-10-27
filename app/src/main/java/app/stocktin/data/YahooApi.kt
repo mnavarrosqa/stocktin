@@ -30,6 +30,10 @@ object YahooApi {
     @Volatile
     private var crumb: String? = null
 
+    /** Solo para las capturas de pantalla: respuestas armadas en vez de ir a Yahoo. */
+    @Volatile
+    var fakeResponses: ((url: String) -> String)? = null
+
     init {
         CookieHandler.setDefault(cookies)
     }
@@ -63,6 +67,16 @@ object YahooApi {
     suspend fun search(query: String): List<SearchResult> = withContext(Dispatchers.IO) {
         val q = URLEncoder.encode(query.trim(), "UTF-8")
         YahooParser.parseSearch(get("$HOST/v1/finance/search?q=$q&quotesCount=12&newsCount=0&listsCount=0"))
+    }
+
+    suspend fun news(symbol: String): List<NewsItem> = withContext(Dispatchers.IO) {
+        val q = URLEncoder.encode(symbol, "UTF-8")
+        YahooParser.parseNews(get("$HOST/v1/finance/search?q=$q&quotesCount=0&newsCount=8&listsCount=0"))
+    }
+
+    /** Lo más buscado hoy en Yahoo Finance (EE.UU.). */
+    suspend fun trending(): List<String> = withContext(Dispatchers.IO) {
+        YahooParser.parseTrending(get("$HOST/v1/finance/trending/US?count=12"))
     }
 
     private fun chart(symbol: String, range: String, interval: String, prePost: Boolean): Chart {
@@ -99,6 +113,7 @@ object YahooApi {
     class HttpException(val code: Int) : IOException("Yahoo respondió $code")
 
     private fun get(url: String): String {
+        fakeResponses?.let { return it(url) }
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 10_000
             readTimeout = 15_000

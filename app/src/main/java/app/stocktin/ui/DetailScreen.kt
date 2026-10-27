@@ -1,5 +1,12 @@
 package app.stocktin.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.style.TextOverflow
+import coil.compose.AsyncImage
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -146,6 +153,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                         .verticalScroll(rememberScrollState()),
                 ) {
                     Stats(quote)
+                    News(viewModel, symbol)
                 }
             }
         } else {
@@ -157,6 +165,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
             ) {
                 top(260.dp)
                 Stats(quote)
+                News(viewModel, symbol)
                 Spacer(Modifier.height(24.dp))
             }
         }
@@ -361,4 +370,81 @@ private fun pointTime(epochSeconds: Long, range: ChartRange): String {
     }
     return DateTimeFormatter.ofPattern(pattern, Locale.forLanguageTag("es-AR"))
         .format(Instant.ofEpochSecond(epochSeconds).atZone(ZoneId.systemDefault()))
+}
+
+/** Las últimas noticias del símbolo; tocar una la abre en el navegador. */
+@Composable
+private fun News(viewModel: MainViewModel, symbol: String) {
+    val news by viewModel.news.collectAsState()
+    val items = news?.takeIf { it.first == symbol }?.second
+    val uri = LocalUriHandler.current
+    Column(Modifier.padding(horizontal = 16.dp)) {
+        Text(
+            "Noticias",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 8.dp),
+        )
+        when {
+            items == null -> repeat(3) {
+                Placeholder(Modifier.fillMaxWidth().height(72.dp).padding(vertical = 4.dp))
+            }
+            items.isEmpty() -> Text(
+                "No hay noticias recientes.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(start = 4.dp),
+            )
+            else -> items.forEach { item ->
+                Surface(
+                    onClick = { runCatching { uri.openUri(item.link) } },
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.Transparent,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(Modifier.padding(vertical = 8.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                item.title,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                listOf(item.publisher, timeAgo(item.time)).filter { it.isNotBlank() }.joinToString(" · "),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                        if (item.thumbnail != null) {
+                            Spacer(Modifier.width(12.dp))
+                            AsyncImage(
+                                model = item.thumbnail,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** "hace 5 min", "hace 3 h", "hace 2 d". */
+private fun timeAgo(epochSeconds: Long): String {
+    if (epochSeconds <= 0) return ""
+    val minutes = (System.currentTimeMillis() / 1000 - epochSeconds) / 60
+    return when {
+        minutes < 1 -> "recién"
+        minutes < 60 -> "hace $minutes min"
+        minutes < 60 * 24 -> "hace ${minutes / 60} h"
+        else -> "hace ${minutes / (60 * 24)} d"
+    }
 }

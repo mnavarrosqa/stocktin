@@ -16,6 +16,10 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import app.stocktin.data.Format
 
 /** Minigráfico de una fila de la lista. */
 @Composable
@@ -42,6 +46,8 @@ fun PriceChart(
 ) {
     val dash = MaterialColors.outline()
     val guide = MaterialColors.onSurfaceVariant()
+    val measurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = guide, fontFeatureSettings = "tnum")
     Canvas(
         modifier.pointerInput(prices) {
             if (prices.size < 2) return@pointerInput
@@ -62,7 +68,19 @@ fun PriceChart(
         },
     ) {
         if (prices.size < 2) return@Canvas
-        drawSeries(prices, baseline, color, dash, strokeWidth = 2.dp.toPx(), selected = selected, guide = guide)
+        val point = drawSeries(prices, baseline, color, dash, strokeWidth = 2.dp.toPx(), selected = selected, guide = guide, labelSpace = 16.dp.toPx())
+        if (selected == null) {
+            // Máximo y mínimo del rango, como en la app Bolsa de Apple.
+            val high = prices.indices.maxBy { prices[it] }
+            val low = prices.indices.minBy { prices[it] }
+            listOf(high to true, low to false).distinctBy { it.first }.forEach { (index, above) ->
+                val text = measurer.measure(Format.price(prices[index]), labelStyle)
+                val p = point(index)
+                val x = (p.x - text.size.width / 2f).coerceIn(0f, size.width - text.size.width)
+                val y = if (above) p.y - text.size.height - 4.dp.toPx() else p.y + 4.dp.toPx()
+                drawText(text, topLeft = Offset(x, y.coerceIn(0f, size.height - text.size.height)))
+            }
+        }
     }
 }
 
@@ -74,7 +92,8 @@ private fun DrawScope.drawSeries(
     strokeWidth: Float,
     selected: Int?,
     guide: Color = dash,
-) {
+    labelSpace: Float = 0f,
+): (Int) -> Offset {
     var min = prices.min()
     var max = prices.max()
     if (baseline != null) {
@@ -85,7 +104,8 @@ private fun DrawScope.drawSeries(
         max += 1
         min -= 1
     }
-    val pad = strokeWidth * 2
+    // Lugar arriba y abajo para las etiquetas de máximo y mínimo.
+    val pad = strokeWidth * 2 + labelSpace
     val w = size.width
     val h = size.height - 2 * pad
     fun x(i: Int) = w * i / (prices.size - 1)
@@ -119,6 +139,7 @@ private fun DrawScope.drawSeries(
         drawCircle(color, radius = 5.dp.toPx(), center = Offset(sx, y(prices[selected])))
         drawCircle(Color.White, radius = 2.dp.toPx(), center = Offset(sx, y(prices[selected])))
     }
+    return { i -> Offset(x(i), y(prices[i])) }
 }
 
 private object MaterialColors {

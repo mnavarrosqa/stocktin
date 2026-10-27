@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -55,6 +56,15 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        // Para las capturas de pantalla con Robolectric.
+        unitTests.isIncludeAndroidResources = true
+    }
+}
+
+// Las capturas de pantalla (src/test/.../screenshots) corren aparte, con recordRoborazziDebug.
+tasks.withType<Test>().configureEach {
+    if (name.contains("Release")) exclude("**/screenshots/**")
 }
 
 dependencies {
@@ -75,8 +85,16 @@ dependencies {
     implementation(libs.androidx.glance.material3)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
     // org.json de verdad: el de android.jar en los tests locales es solo un esqueleto.
     testImplementation(libs.json)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.androidx.test.junit)
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.androidx.work.testing)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

@@ -77,6 +77,16 @@ data class SearchResult(
     val type: String?,
 )
 
+/** Una noticia sobre un símbolo. */
+data class NewsItem(
+    val title: String,
+    val publisher: String,
+    val link: String,
+    /** Segundos desde 1970. */
+    val time: Long,
+    val thumbnail: String?,
+)
+
 /** Una lista de seguimiento. */
 data class Watchlist(
     val id: String,
@@ -94,4 +104,23 @@ enum class ChartRange(val label: String, val range: String, val interval: String
     YEAR("1A", "1y", "1d"),
     FIVE_YEARS("5A", "5y", "1wk"),
     MAX("Máx", "max", "1mo"),
+}
+
+/** Orden de los símbolos en la lista de la app (los widgets siguen el orden propio de la lista). */
+enum class SortMode(val label: String) {
+    CUSTOM("Personalizado"),
+    GAINERS("Mayor suba"),
+    LOSERS("Mayor baja"),
+    NAME("Símbolo A-Z");
+
+    fun apply(symbols: List<String>, quotes: Map<String, Quote>): List<String> = when (this) {
+        CUSTOM -> symbols
+        GAINERS -> symbols.sortedByDescending { quotes[it]?.changePercent ?: Double.NEGATIVE_INFINITY }
+        LOSERS -> symbols.sortedBy { quotes[it]?.changePercent ?: Double.POSITIVE_INFINITY }
+        NAME -> symbols.sortedBy { it.removePrefix("^") }
+    }
+
+    companion object {
+        fun from(key: String?) = entries.firstOrNull { it.name == key } ?: CUSTOM
+    }
 }

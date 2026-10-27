@@ -20,4 +20,7 @@ val MARKET_SECTIONS = listOf(
     ),
 )
 
+/** La tira de arriba de Listas: cómo viene el día de un vistazo. */
+val STRIP_SYMBOLS = listOf("^GSPC" to "S&P 500", "^IXIC" to "Nasdaq", "^DJI" to "Dow Jones", "BTC-USD" to "Bitcoin")
+
 val MARKET_SYMBOLS: List<String> = MARKET_SECTIONS.flatMap { section -> section.symbols.map { it.first } }

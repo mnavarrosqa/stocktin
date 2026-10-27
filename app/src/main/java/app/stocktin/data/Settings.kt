@@ -34,6 +34,16 @@ class Settings(context: Context) {
         get() = prefs.getLong("last_update_check", 0)
         set(value) = prefs.edit().putLong("last_update_check", value).apply()
 
+    /** Orden de la lista en la app ([SortMode]). */
+    var sortMode: String?
+        get() = prefs.getString("sort_mode", null)
+        set(value) = prefs.edit().putString("sort_mode", value).apply()
+
+    /** Últimas búsquedas, la más reciente primero. */
+    var recentSearches: List<String>
+        get() = prefs.getString("recent_searches", null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
+        set(value) = prefs.edit().putString("recent_searches", value.take(8).joinToString("\n")).apply()
+
     /** Mostrar el cambio en dinero en vez de en porcentaje. */
     var showChangeValue: Boolean
         get() = prefs.getBoolean("show_change_value", false)

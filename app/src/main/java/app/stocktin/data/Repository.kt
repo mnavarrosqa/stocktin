@@ -84,6 +84,11 @@ class Repository private constructor(context: Context) {
     fun addSymbol(listId: String, symbol: String) =
         editList(listId) { if (symbol in it.symbols) it else it.copy(symbols = it.symbols + symbol) }
 
+    /** Vuelve a poner [symbol] en el lugar [index] (para deshacer un borrado). */
+    fun insertSymbol(listId: String, symbol: String, index: Int) = editList(listId) {
+        if (symbol in it.symbols) it else it.copy(symbols = it.symbols.toMutableList().apply { add(index.coerceIn(0, size), symbol) })
+    }
+
     fun removeSymbol(listId: String, symbol: String) = editList(listId) { it.copy(symbols = it.symbols - symbol) }
 
     /** Mueve un símbolo [delta] lugares (negativo = para arriba). */

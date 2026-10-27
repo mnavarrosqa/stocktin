@@ -1,5 +1,14 @@
 package app.stocktin.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
+import app.stocktin.data.Quote
+import app.stocktin.data.STRIP_SYMBOLS
+import app.stocktin.data.SortMode
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,6 +75,7 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
     val lastRefresh by viewModel.lastRefresh.collectAsState()
     val error by viewModel.lastError.collectAsState()
     val showValue by viewModel.showValue.collectAsState()
+    val sortMode by viewModel.sortMode.collectAsState()
     val list = lists.firstOrNull { it.id == currentId } ?: lists.first()
     var editing by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -129,6 +139,9 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
             modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
         ) {
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = bottomPadding + 16.dp)) {
+                item(key = "strip") {
+                    MarketStrip(quotes) { viewModel.open(Screen.Detail(it)) }
+                }
                 item(key = "chips") {
                     Row(
                         Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
@@ -148,24 +161,26 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                         )
                     }
                 }
-                item(key = "status") {
-                    val market = WatchlistWidget.marketLabel(list.symbols.mapNotNull { quotes[it] })
-                    Text(
-                        text = buildString {
-                            market?.let { append(it.first).append(" · ") }
-                            append(
-                                when {
-                                    refreshing && lastRefresh == 0L -> "Actualizando…"
-                                    lastRefresh == 0L -> "Deslizá hacia abajo para actualizar"
-                                    error != null -> "Sin conexión · ${Format.time(lastRefresh)}"
-                                    else -> "Actualizado ${Format.time(lastRefresh)}"
-                                },
-                            )
-                            if (editing) append(" · Ordená o quitá símbolos")
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                item(key = "summary") {
+                    val listQuotes = list.symbols.mapNotNull { quotes[it] }
+                    val market = WatchlistWidget.marketLabel(listQuotes)
+                    val status = buildString {
+                        market?.let { append(it.first).append(" · ") }
+                        append(
+                            when {
+                                refreshing && lastRefresh == 0L -> "Actualizando…"
+                                lastRefresh == 0L -> "Deslizá hacia abajo para actualizar"
+                                error != null -> "Sin conexión · ${Format.time(lastRefresh)}"
+                                else -> "Actualizado ${Format.time(lastRefresh)}"
+                            },
+                        )
+                    }
+                    Summary(
+                        quotes = listQuotes,
+                        status = if (editing) "Ordená con las flechas o quitá símbolos" else status,
+                        sortMode = sortMode,
+                        onSort = viewModel::setSortMode,
+                        showSort = !editing && list.symbols.size > 1,
                     )
                 }
                 if (list.symbols.isEmpty()) {
@@ -184,19 +199,25 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                         }
                     }
                 }
-                items(list.symbols, key = { it }) { symbol ->
-                    QuoteRow(
-                        symbol = symbol,
-                        quote = quotes[symbol],
-                        showValue = showValue,
-                        selected = symbol == selectedSymbol,
-                        editing = editing,
-                        onClick = { viewModel.open(Screen.Detail(symbol)) },
-                        onLongClick = { editing = true },
-                        onToggleValue = { viewModel.setShowValue(!showValue) },
-                        onMove = { viewModel.moveSymbol(symbol, it) },
-                        onRemove = { viewModel.removeSymbol(symbol) },
-                    )
+                // Ordenando a mano se ve el orden propio de la lista.
+                val shown = if (editing) list.symbols else sortMode.apply(list.symbols, quotes)
+                items(shown, key = { it }) { symbol ->
+                    Box(Modifier.animateItem()) {
+                        SwipeToRemove(enabled = !editing, onRemove = { viewModel.removeSymbol(symbol) }) {
+                            QuoteRow(
+                                symbol = symbol,
+                                quote = quotes[symbol],
+                                showValue = showValue,
+                                selected = symbol == selectedSymbol,
+                                editing = editing,
+                                onClick = { viewModel.open(Screen.Detail(symbol)) },
+                                onLongClick = { editing = true },
+                                onToggleValue = { viewModel.setShowValue(!showValue) },
+                                onMove = { viewModel.moveSymbol(symbol, it) },
+                                onRemove = { viewModel.removeSymbol(symbol) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -271,4 +292,102 @@ private fun NameInputDialog(title: String, initial: String, onDismiss: () -> Uni
         confirmButton = { TextButton(onClick = { onConfirm(text) }, enabled = text.isNotBlank()) { Text("Guardar") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
+}
+
+/** Tira con los índices principales y Bitcoin, para ver cómo viene el día de un vistazo. */
+@Composable
+private fun MarketStrip(quotes: Map<String, Quote>, onOpen: (String) -> Unit) {
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        STRIP_SYMBOLS.forEach { (symbol, name) ->
+            val quote = quotes[symbol]
+            Surface(
+                onClick = { onOpen(symbol) },
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                modifier = Modifier.width(132.dp),
+            ) {
+                Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                    Text(name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    if (quote == null) {
+                        Placeholder(Modifier.padding(top = 6.dp).fillMaxWidth().height(34.dp))
+                    } else {
+                        Text(
+                            Format.price(quote.price),
+                            style = MaterialTheme.typography.titleSmall.tabular(),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                Format.percent(quote.changePercent),
+                                style = MaterialTheme.typography.labelMedium.tabular(),
+                                color = changeColor(quote.change),
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Sparkline(
+                                prices = quote.spark,
+                                baseline = quote.previousClose,
+                                color = changeColor(quote.change),
+                                modifier = Modifier.weight(1f).height(16.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Cuántos suben y cuántos bajan en la lista, con una barra proporcional, y el orden elegido. */
+@Composable
+private fun Summary(quotes: List<Quote>, status: String, sortMode: SortMode, onSort: (SortMode) -> Unit, showSort: Boolean) {
+    val up = quotes.count { it.change > 0 }
+    val down = quotes.count { it.change < 0 }
+    var sortMenu by remember { mutableStateOf(false) }
+    Column(Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                if (quotes.isNotEmpty()) {
+                    Text(
+                        buildString {
+                            append("$up suben")
+                            append(" · $down bajan")
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Text(status, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (showSort) {
+                Box {
+                    TextButton(onClick = { sortMenu = true }) { Text(sortMode.label) }
+                    DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                        SortMode.entries.forEach { mode ->
+                            DropdownMenuItem(
+                                text = { Text(mode.label) },
+                                leadingIcon = { if (mode == sortMode) Icon(Icons.Filled.Check, null) },
+                                onClick = {
+                                    sortMenu = false
+                                    onSort(mode)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        if (up + down > 0) {
+            // Barra de "amplitud": verde lo que sube, rojo lo que baja.
+            Row(Modifier.padding(top = 6.dp, end = 12.dp).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))) {
+                if (up > 0) Box(Modifier.weight(up.toFloat()).fillMaxHeight().background(Up))
+                if (up > 0 && down > 0) Spacer(Modifier.width(2.dp))
+                if (down > 0) Box(Modifier.weight(down.toFloat()).fillMaxHeight().background(Down))
+            }
+        }
+    }
 }

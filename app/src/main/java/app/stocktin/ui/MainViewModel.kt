@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import app.stocktin.data.Chart
 import app.stocktin.data.ChartRange
 import app.stocktin.data.MARKET_SYMBOLS
+import app.stocktin.data.STRIP_SYMBOLS
+import app.stocktin.data.NewsItem
+import app.stocktin.data.SortMode
 import app.stocktin.data.Repository
 import app.stocktin.data.SearchResult
 import app.stocktin.data.Settings
@@ -41,6 +44,9 @@ sealed interface UpdateState {
 
     data class Available(override val release: Release) : UpdateState
 }
+
+/** Un aviso abajo de la pantalla, con un botón opcional (por ejemplo, Deshacer). */
+data class Message(val text: String, val actionLabel: String? = null, val action: (() -> Unit)? = null)
 
 data class ChartState(
     val symbol: String,
@@ -108,8 +114,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val installedVersion: String = runCatching { updater.installedVersionName }.getOrDefault("")
 
-    private val _message = MutableStateFlow<String?>(null)
-    val message: StateFlow<String?> = _message.asStateFlow()
+    private val _message = MutableStateFlow<Message?>(null)
+    val message: StateFlow<Message?> = _message.asStateFlow()
+
+    private val _sortMode = MutableStateFlow(SortMode.from(settings.sortMode))
+    val sortMode: StateFlow<SortMode> = _sortMode.asStateFlow()
+
+    /** Noticias del símbolo abierto (null mientras cargan). */
+    private val _news = MutableStateFlow<Pair<String, List<NewsItem>?>?>(null)
+    val news: StateFlow<Pair<String, List<NewsItem>?>?> = _news.asStateFlow()
+    private var newsJob: Job? = null
+
+    private val _trending = MutableStateFlow<List<String>>(emptyList())
+    val trending: StateFlow<List<String>> = _trending.asStateFlow()
+
+    private val _recent = MutableStateFlow(settings.recentSearches)
+    val recent: StateFlow<List<String>> = _recent.asStateFlow()
 
     /** La app está a la vista (entre onStart y onStop). */
     @Volatile
@@ -137,8 +157,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun refresh(quiet: Boolean = false) {
         lastAttempt = System.currentTimeMillis()
         viewModelScope.launch {
-            val result = Widgets.refresh(getApplication())
-            if (!quiet && result.isFailure) _message.value = "No se pudo actualizar. Revisá la conexión."
+            val result = Widgets.refresh(getApplication(), extra = STRIP_SYMBOLS.map { it.first })
+            if (!quiet && result.isFailure) showMessage("No se pudo actualizar. Revisá la conexión.")
         }
     }
 
@@ -161,6 +181,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (screen is Screen.Search) {
             _query.value = ""
             _results.value = emptyList()
+            if (_trending.value.isEmpty()) loadTrending()
         }
     }
 
@@ -213,19 +234,56 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleSymbol(symbol: String, listId: String = _currentList.value) {
         val list = repository.list(listId) ?: return
         if (symbol in list.symbols) {
-            repository.removeSymbol(list.id, symbol)
+            removeSymbol(symbol, list.id)
         } else {
             repository.addSymbol(list.id, symbol)
+            rememberSearch(symbol)
             if (repository.quotes.value[symbol] == null) {
                 viewModelScope.launch { repository.refresh(listOf(symbol)) }
             }
+            _message.value = Message("$symbol agregado a ${list.name}", "Deshacer") {
+                repository.removeSymbol(list.id, symbol)
+                widgetsChanged()
+            }
+            widgetsChanged()
+        }
+    }
+
+    /** Saca [symbol] de la lista, con la opción de deshacerlo. */
+    fun removeSymbol(symbol: String, listId: String = _currentList.value) {
+        val list = repository.list(listId) ?: return
+        val index = list.symbols.indexOf(symbol).takeIf { it >= 0 } ?: return
+        repository.removeSymbol(list.id, symbol)
+        _message.value = Message("$symbol quitado de ${list.name}", "Deshacer") {
+            repository.insertSymbol(list.id, symbol, index)
+            widgetsChanged()
         }
         widgetsChanged()
     }
 
-    fun removeSymbol(symbol: String) {
-        repository.removeSymbol(_currentList.value, symbol)
-        widgetsChanged()
+    fun setSortMode(mode: SortMode) {
+        settings.sortMode = mode.name
+        _sortMode.value = mode
+    }
+
+    /** Guarda [symbol] entre las búsquedas recientes. */
+    fun rememberSearch(symbol: String) {
+        val updated = (listOf(symbol) + _recent.value.filterNot { it == symbol }).take(8)
+        settings.recentSearches = updated
+        _recent.value = updated
+    }
+
+    fun clearRecent() {
+        settings.recentSearches = emptyList()
+        _recent.value = emptyList()
+    }
+
+    private fun loadTrending() {
+        viewModelScope.launch {
+            val symbols = runCatching { YahooApi.trending() }.getOrDefault(emptyList())
+            _trending.value = symbols
+            repository.refresh(symbols.filter { repository.quotes.value[it] == null })
+        }
     }
 
     fun moveSymbol(symbol: String, delta: Int) {
@@ -263,6 +321,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun loadDetail(symbol: String) {
+        if (_news.value?.first != symbol) {
+            newsJob?.cancel()
+            _news.value = symbol to null
+            newsJob = viewModelScope.launch {
+                _news.value = symbol to runCatching { YahooApi.news(symbol) }.getOrDefault(emptyList())
+            }
+        }
         loadChart(symbol, _chart.value?.takeIf { it.symbol == symbol }?.range ?: ChartRange.DAY)
         if (repository.quotes.value[symbol] == null) {
             viewModelScope.launch { repository.refresh(listOf(symbol)) }
@@ -304,7 +369,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun showMessage(text: String) {
-        _message.value = text
+        _message.value = Message(text)
     }
 
     fun messageShown() {
@@ -324,10 +389,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         _update.value = UpdateState.Available(release)
                         if (!manual) _updateDialog.value = true
                     } else if (manual) {
-                        _message.value = "Ya tenés la última versión"
+                        showMessage("Ya tenés la última versión")
                     }
                 }
-                .onFailure { if (manual) _message.value = "No se pudo buscar actualizaciones" }
+                .onFailure { if (manual) showMessage("No se pudo buscar actualizaciones") }
             _checkingUpdates.value = false
         }
     }

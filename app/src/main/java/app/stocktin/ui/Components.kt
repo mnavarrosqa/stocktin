@@ -1,5 +1,16 @@
 package app.stocktin.ui
 
+import androidx.compose.animation.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -147,12 +158,13 @@ fun QuoteRow(
     onRemove: () -> Unit,
 ) {
     val background by animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+        if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
         label = "rowBackground",
     )
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 8.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(background)
@@ -162,13 +174,17 @@ fun QuoteRow(
     ) {
         Column(Modifier.weight(1f)) {
             Text(symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(
-                quote?.name ?: "",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (quote != null) {
+                Text(
+                    quote.name,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
+                Placeholder(Modifier.padding(top = 4.dp).width(110.dp).height(12.dp))
+            }
         }
         if (editing) {
             IconButton(onClick = { onMove(-1) }) { Icon(Icons.Filled.KeyboardArrowUp, "Subir") }
@@ -177,7 +193,10 @@ fun QuoteRow(
             return@Row
         }
         if (quote == null) {
-            Text("—", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Mientras llega la primera cotización: la forma de la fila, sin números.
+            Placeholder(Modifier.width(60.dp).height(26.dp))
+            Spacer(Modifier.width(12.dp))
+            Placeholder(Modifier.width(150.dp).height(30.dp))
             return@Row
         }
         Sparkline(
@@ -189,11 +208,7 @@ fun QuoteRow(
         Spacer(Modifier.width(12.dp))
         Column(horizontalAlignment = Alignment.End) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    Format.price(quote.price),
-                    style = MaterialTheme.typography.titleMedium.tabular(),
-                    fontWeight = FontWeight.SemiBold,
-                )
+                FlashingPrice(symbol, quote.price)
                 Spacer(Modifier.width(10.dp))
                 ChangePill(quote, showValue, onToggleValue)
             }
@@ -217,6 +232,70 @@ fun QuoteRow(
     }
 }
 
+/**
+ * Una fila que se desliza hacia la izquierda para quitarla de la lista (como en Mail o en la app
+ * Bolsa de Apple). Debajo aparece el fondo rojo con el tacho.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SwipeToRemove(enabled: Boolean, onRemove: () -> Unit, content: @Composable () -> Unit) {
+    val state = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) onRemove()
+            // La fila vuelve a su lugar: si se quitó, desaparece igual porque ya no está en la lista.
+            false
+        },
+        positionalThreshold = { distance -> distance * 0.4f },
+    )
+    SwipeToDismissBox(
+        state = state,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = enabled,
+        backgroundContent = {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Icon(Icons.Filled.Delete, "Quitar", tint = MaterialTheme.colorScheme.onErrorContainer)
+            }
+        },
+    ) { content() }
+}
+
+/** El precio, con un destello verde o rojo cuando cambia (como en las apps de los brokers). */
+@Composable
+private fun FlashingPrice(symbol: String, price: Double) {
+    val flash = remember(symbol) { Animatable(Color.Transparent) }
+    var last by remember(symbol) { mutableStateOf(price) }
+    LaunchedEffect(symbol, price) {
+        if (price != last) {
+            flash.snapTo(changeColor(price - last).copy(alpha = 0.28f))
+            last = price
+            flash.animateTo(Color.Transparent, tween(durationMillis = 900))
+        }
+    }
+    Text(
+        Format.price(price),
+        style = MaterialTheme.typography.titleMedium.tabular(),
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(flash.value)
+            .padding(horizontal = 4.dp, vertical = 1.dp),
+    )
+}
+
+/** Un bloque gris del tamaño de lo que va a aparecer. */
+@Composable
+fun Placeholder(modifier: Modifier) {
+    Box(modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest))
+}
+
 /** Etiqueta con el cambio del día. Tocarla alterna entre porcentaje y dinero. */
 @Composable
 fun ChangePill(quote: Quote, showValue: Boolean, onClick: () -> Unit) {
@@ -237,16 +316,16 @@ fun ChangePill(quote: Quote, showValue: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** Muestra los mensajes de la app como snackbar. */
+/** Muestra los mensajes de la app como snackbar, con su botón (por ejemplo, Deshacer). */
 @Composable
 fun rememberMessages(viewModel: MainViewModel): SnackbarHostState {
     val host = remember { SnackbarHostState() }
     val message by viewModel.message.collectAsState()
     LaunchedEffect(message) {
-        message?.let {
-            host.showSnackbar(it)
-            viewModel.messageShown()
-        }
+        val current = message ?: return@LaunchedEffect
+        val result = host.showSnackbar(current.text, actionLabel = current.actionLabel, duration = SnackbarDuration.Short)
+        if (result == SnackbarResult.ActionPerformed) current.action?.invoke()
+        viewModel.messageShown()
     }
     return host
 }
