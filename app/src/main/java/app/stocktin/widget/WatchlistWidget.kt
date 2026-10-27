@@ -161,7 +161,7 @@ class WatchlistWidget(
                     )
                 }
                 layout == WidgetLayout.MOSAIC -> Mosaic(rows, size.width - horizontalPadding * 2, size.height, options)
-                else -> QuoteList(rows, size.width - horizontalPadding * 2, options)
+                else -> QuoteList(rows, size.width - horizontalPadding * 2, size.height - 66.dp, options)
             }
         }
     }
@@ -218,27 +218,51 @@ class WatchlistWidget(
         }
     }
 
-    /** Lista de una columna, o de dos si el widget es muy ancho (tablet o foldable desplegado). */
+    /**
+     * Lista de una columna, o de dos si el widget es muy ancho (tablet o foldable desplegado).
+     * Si entran todas las filas, se reparten el alto del widget (sin franja vacía abajo); si no,
+     * se hace scroll.
+     */
     @Composable
-    private fun QuoteList(rows: List<Pair<String, Quote?>>, width: Dp, options: RowOptions) {
+    private fun QuoteList(rows: List<Pair<String, Quote?>>, width: Dp, height: Dp, options: RowOptions) {
         val columns = if (width >= 460.dp) 2 else 1
         val density = RowDensity.of(width / columns - if (columns > 1) 12.dp else 0.dp)
-        Grid(rows, columns) { (symbol, quote) ->
-            Column(modifier = GlanceModifier.fillMaxWidth().padding(horizontal = if (columns > 1) 6.dp else 0.dp)) {
-                QuoteRow(symbol, quote, density, options)
-                Spacer(GlanceModifier.fillMaxWidth().height(1.dp).background(options.palette.divider))
+        val lines = ceil(rows.size / columns.toDouble()).toInt()
+        val fill = lines <= 10 && lines * density.minHeight <= height
+        val last = rows.chunked(columns).lastOrNull().orEmpty().map { it.first }.toSet()
+        Grid(rows, columns, fill) { (symbol, quote) ->
+            Column(
+                modifier = (if (fill) GlanceModifier.fillMaxSize() else GlanceModifier.fillMaxWidth())
+                    .padding(horizontal = if (columns > 1) 6.dp else 0.dp),
+            ) {
+                Box(
+                    modifier = if (fill) GlanceModifier.fillMaxWidth().defaultWeight() else GlanceModifier.fillMaxWidth(),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    QuoteRow(symbol, quote, density, options)
+                }
+                if (symbol !in last) {
+                    Spacer(GlanceModifier.fillMaxWidth().height(1.dp).background(options.palette.divider))
+                }
             }
         }
     }
 
-    /** Los símbolos en [columns] columnas, con scroll si no entran. */
+    /** Los símbolos en [columns] columnas: llenando el alto ([fill]) o con scroll si no entran. */
     @Composable
-    private fun Grid(rows: List<Pair<String, Quote?>>, columns: Int, item: @Composable (Pair<String, Quote?>) -> Unit) {
+    private fun Grid(
+        rows: List<Pair<String, Quote?>>,
+        columns: Int,
+        fill: Boolean,
+        item: @Composable (Pair<String, Quote?>) -> Unit,
+    ) {
         when {
-            !scrollable -> Column(modifier = GlanceModifier.fillMaxSize()) {
+            fill || !scrollable -> Column(modifier = GlanceModifier.fillMaxSize()) {
                 // Glance admite hasta 10 hijos por fila o columna.
                 rows.chunked(columns).take(10).forEach { line ->
-                    Row(modifier = GlanceModifier.fillMaxWidth()) {
+                    Row(
+                        modifier = if (fill) GlanceModifier.fillMaxWidth().defaultWeight() else GlanceModifier.fillMaxWidth(),
+                    ) {
                         line.forEach { Box(modifier = GlanceModifier.defaultWeight()) { item(it) } }
                         repeat(columns - line.size) { Spacer(GlanceModifier.defaultWeight()) }
                     }
@@ -254,35 +278,40 @@ class WatchlistWidget(
     }
 
     /** Cuánto entra en cada fila según su ancho. */
-    private enum class RowDensity {
-        /** Símbolo arriba, precio y cambio abajo. */
-        TINY,
+    private enum class RowDensity(val minHeight: Dp) {
+        /** Símbolo y cambio arriba, precio abajo. */
+        TINY(44.dp),
         /** Símbolo a la izquierda; precio y cambio apilados a la derecha. */
-        NARROW,
-        /** Precio y cambio en la misma línea. */
-        MEDIUM,
+        NARROW(46.dp),
+        /** Con nombre, sin minigráfico. */
+        MEDIUM(50.dp),
         /** Además, minigráfico. */
-        WIDE,
+        WIDE(50.dp),
         /** Minigráfico más grande. */
-        XWIDE;
+        XWIDE(52.dp);
 
         companion object {
             fun of(rowWidth: Dp) = when {
                 rowWidth < 150.dp -> TINY
                 rowWidth < 230.dp -> NARROW
-                rowWidth < 290.dp -> MEDIUM
-                rowWidth < 360.dp -> WIDE
+                rowWidth < 280.dp -> MEDIUM
+                rowWidth < 340.dp -> WIDE
                 else -> XWIDE
             }
         }
     }
 
+    /**
+     * Una fila como en Yahoo o la app Bolsa: símbolo y nombre a la izquierda, el minigráfico en el
+     * medio y a la derecha el precio con el cambio abajo, en una columna angosta para que el
+     * nombre tenga lugar.
+     */
     @Composable
     private fun QuoteRow(symbol: String, quote: Quote?, density: RowDensity, options: RowOptions) {
         val p = options.palette
         val open = openSymbol(symbol)
         if (density == RowDensity.TINY) {
-            Column(modifier = GlanceModifier.fillMaxWidth().padding(vertical = 6.dp).clickable(open)) {
+            Column(modifier = GlanceModifier.fillMaxWidth().padding(vertical = 5.dp).clickable(open)) {
                 Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         symbol,
@@ -306,7 +335,7 @@ class WatchlistWidget(
         }
         val big = density >= RowDensity.MEDIUM
         Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(vertical = if (big) 8.dp else 6.dp).clickable(open),
+            modifier = GlanceModifier.fillMaxWidth().padding(vertical = 6.dp).clickable(open),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = GlanceModifier.defaultWeight()) {
@@ -320,35 +349,31 @@ class WatchlistWidget(
                 }
             }
             val sparkWidth = when (density) {
-                RowDensity.WIDE -> 52.dp
-                RowDensity.XWIDE -> 68.dp
+                RowDensity.WIDE -> 56.dp
+                RowDensity.XWIDE -> 72.dp
                 else -> 0.dp
             }
             if (options.showSpark && sparkWidth > 0.dp && quote != null) {
-                SparkImage(quote, sparkWidth, 26.dp)
-                Spacer(GlanceModifier.width(10.dp))
+                Spacer(GlanceModifier.width(8.dp))
+                SparkImage(quote, sparkWidth, 28.dp)
+                Spacer(GlanceModifier.width(12.dp))
             }
             if (quote == null) {
                 Text("—", style = TextStyle(color = p.secondary, fontSize = 15.sp))
                 return@Row
             }
-            Column(horizontalAlignment = Alignment.End) {
-                if (big) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Ancho fijo para que los minigráficos queden alineados en columna.
-                        PriceText(quote, p, 16.sp, width = 88.dp)
-                        Spacer(GlanceModifier.width(8.dp))
-                        ChangeText(quote, p, options.pill, options.showValue, 14.sp, 76.dp)
-                    }
-                } else {
-                    PriceText(quote, p, 14.sp)
-                    ChangeText(quote, p, options.pill, options.showValue, 12.sp, 64.dp)
-                }
+            // Columna de ancho fijo: los minigráficos y los precios quedan alineados.
+            Column(
+                modifier = GlanceModifier.width(if (big) 96.dp else 78.dp),
+                horizontalAlignment = Alignment.End,
+            ) {
+                PriceText(quote, p, if (big) 16.sp else 14.sp)
+                ChangeText(quote, p, options.pill, options.showValue, if (big) 13.sp else 12.sp, 0.dp, alignEnd = true, fitContent = true)
                 val ext = quote.extChangePercent
                 if (options.showExt && big && quote.extSession != null && ext != null) {
                     Row {
                         Text(
-                            "${quote.extSession.label} ${quote.extPrice?.let(Format::price).orEmpty()}  ",
+                            "${quote.extSession.label} ",
                             maxLines = 1,
                             style = TextStyle(color = p.secondary, fontSize = 11.sp),
                         )
@@ -376,7 +401,7 @@ class WatchlistWidget(
         // Si entran todas, se estiran para llenar el widget; si no, se hace scroll.
         val available = height - 60.dp
         val tileHeight = (available / lines - 4.dp).coerceIn(52.dp, 96.dp)
-        Grid(rows, columns) { (symbol, quote) ->
+        Grid(rows, columns, fill = false) { (symbol, quote) ->
             Box(modifier = GlanceModifier.padding(2.dp)) {
                 Tile(symbol, quote, tileHeight, options)
             }
@@ -479,12 +504,15 @@ fun ChangeText(
     minWidth: Dp,
     /** Falso debajo de un precio alineado a la izquierda (widget de un símbolo). */
     alignEnd: Boolean = true,
+    /** Sin ancho fijo: la etiqueta mide lo que el texto (en la columna de precios de la lista). */
+    fitContent: Boolean = false,
 ) {
+    val fixed = alignEnd && !fitContent
     val text = if (showValue) Format.change(quote.change) else Format.percent(quote.changePercent)
     if (pill) {
         Box(
             modifier = GlanceModifier
-                .let { if (alignEnd) it.width(minWidth) else it }
+                .let { if (fixed) it.width(minWidth) else it }
                 .cornerRadius(8.dp)
                 .background(if (quote.isUp) p.upPill else p.downPill)
                 .padding(horizontal = 6.dp, vertical = 3.dp),
@@ -506,7 +534,7 @@ fun ChangeText(
                 fontWeight = FontWeight.Bold,
                 textAlign = if (alignEnd) TextAlign.End else TextAlign.Start,
             ),
-            modifier = if (alignEnd) GlanceModifier.width(minWidth) else GlanceModifier,
+            modifier = if (fixed) GlanceModifier.width(minWidth) else GlanceModifier,
         )
     }
 }

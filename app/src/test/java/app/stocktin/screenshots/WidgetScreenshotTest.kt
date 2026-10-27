@@ -94,7 +94,7 @@ class WidgetScreenshotTest {
         TickerWidget().Content(symbol, rows.toMap()[symbol], WidgetPalette.of(theme), pill = false, showValue = false)
     }
 
-    @Test fun list4x4() = render("01_lista_4x4", 340.dp, 400.dp) { ListWidget(WidgetTheme.DYNAMIC) }
+    @Test fun list4x4() = render("01_lista_4x5", 340.dp, 560.dp) { ListWidget(WidgetTheme.DYNAMIC, count = 9) }
 
     @Test
     @Config(qualifiers = "w411dp-h914dp-night-xxhdpi")
