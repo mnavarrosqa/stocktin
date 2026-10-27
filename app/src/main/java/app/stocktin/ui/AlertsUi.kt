@@ -118,14 +118,14 @@ fun AlertRow(alert: Alert, price: Double?, showSymbol: Boolean, onRemove: () -> 
 }
 
 /**
- * La hoja para crear una alerta: el precio (arranca en el de ahora) y atajos de ±5 % y ±10 %.
+ * La hoja para crear una alerta: el precio (arranca 5 % arriba del de ahora) y atajos de ±5 % y ±10 %.
  * Al crear la primera, Android pide permiso para mostrar notificaciones.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewAlertSheet(symbol: String, price: Double, onCreate: (Double) -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    var text by remember { mutableStateOf(plain(price)) }
+    var text by remember { mutableStateOf(plain(price * 1.05)) }
     val target = Alerts.parsePrice(text)
     val valid = target != null && target != price
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {

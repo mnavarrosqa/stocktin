@@ -272,7 +272,7 @@ private fun AlertsSection(
     onRemove: (Alert) -> Unit,
     onNotificationSettings: () -> Unit,
 ) {
-    if (!canNotify) {
+    if (!canNotify && alerts.isNotEmpty()) {
         LinkRow(Icons.Filled.Warning, "Las notificaciones están apagadas", "Activalas para que suenen las alertas", onNotificationSettings)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     }
