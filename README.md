@@ -6,11 +6,11 @@ pantalla de inicio pensado para ser mejor que el de Yahoo Finance.
 **Descargar:** [stocktin.apk (última versión)](https://github.com/mnavarrosqa/stocktin/releases/latest/download/stocktin.apk).
 Abrilo desde el teléfono para instalar. Requiere Android 9 o superior.
 
-**Actualizar:** la app busca versiones nuevas al abrirse (como mucho cada 6 horas) y muestra un
-aviso con las novedades y el botón **Actualizar**, que descarga el APK con el navegador; al
-terminar, se toca la descarga para instalarla encima. La app no pide permiso para instalar apps
-por su cuenta: es lo que hace que Play Protect la confunda con apps dañinas.
-También se puede buscar a mano en Ajustes → Actualizaciones de la app.
+**Actualizar:** la app busca versiones nuevas al abrirse (como mucho cada 6 horas) y avisa con las
+novedades; **Descargar** baja el APK con el administrador de descargas de Android (el avance se ve
+en Ajustes) y al terminar se toca la notificación de la descarga para instalarla encima. La app no
+pide permiso para instalar apps por su cuenta: es lo que hace que Play Protect la confunda con apps
+dañinas. Después de actualizar muestra las novedades, y en Ajustes está el historial de versiones.
 
 ## El widget
 
@@ -49,8 +49,10 @@ búsqueda al lado.
   la bisagra; en un foldable las pestañas quedan en la barra flotante y en tablets grandes pasan a
   una barra lateral. En paneles angostos las filas sacan el minigráfico para que entre el nombre. Medio plegada en modo mesa, el gráfico queda arriba y los
   datos abajo.
-- **Mercados:** índices (S&P 500, Nasdaq, Merval…), cripto, materias primas y monedas en tarjetas
-  con su gráfico del día.
+- **Mercados:** si Wall Street está abierto y cuánto falta para que cierre o abra (en tu hora), lo
+  que más sube, baja y se opera hoy, y secciones de índices, Argentina (Merval, ADRs y dólar),
+  sectores de EE.UU. como mapa de calor, cripto, materias primas y monedas y tasas, con chips para
+  saltar a cada una.
 - **Varias listas** (por ejemplo "USD", "Argentina", "Cripto"), con pestañas para pasar de una a otra.
 - **Búsqueda** por símbolo o nombre, con sugerencias (S&P 500, Nasdaq, Merval, Bitcoin, oro,
   dólar/peso…).
