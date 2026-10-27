@@ -1,0 +1,86 @@
+name: Build APK
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Dos merges seguidos a main no publican releases en paralelo.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Historial y etiquetas completos para armar las novedades desde la versión anterior.
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      # La clave de firma vive en los secrets del repo, no en el código.
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.STOCKTIN_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/stocktin-release.p12"
+            echo "STOCKTIN_KEYSTORE_FILE=$RUNNER_TEMP/stocktin-release.p12" >> "$GITHUB_ENV"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "::error::Falta el secret STOCKTIN_KEYSTORE_BASE64: no se publica un APK que no se pueda instalar encima del anterior."
+            exit 1
+          else
+            echo "::warning::Sin clave de firma: este APK se firma con la clave de debug."
+          fi
+      - name: Run tests
+        run: ./gradlew testReleaseUnitTest
+      - name: Build release APK
+        env:
+          STOCKTIN_KEYSTORE_PASSWORD: ${{ secrets.STOCKTIN_KEYSTORE_PASSWORD }}
+        run: ./gradlew assembleRelease
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/app-release.apk stocktin.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stocktin-apk
+          path: stocktin.apk
+      # Novedades: el título de cada PR (o commit) que entró desde la versión anterior. La app las muestra
+      # en el aviso de actualización y después de actualizar.
+      - name: Write release notes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          PREV=$(git describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || true)
+          RANGE="${PREV:+$PREV..}HEAD"
+          git log --merges --first-parent --format='%b' "$RANGE" | sed '/^[[:space:]]*$/d' | sed 's/^/- /' > changes.md
+          # Sin PRs (commits directos a main) se usan los títulos de los commits.
+          [ -s changes.md ] || git log --no-merges --first-parent --format='%s' "$RANGE" | sed 's/^/- /' > changes.md
+          [ -s changes.md ] || echo "- Mejoras y correcciones" > changes.md
+          {
+            echo "## Novedades"
+            echo
+            cat changes.md
+            echo
+            echo "Para instalar o actualizar, abrí \`stocktin.apk\` desde el teléfono, o tocá **Actualizar** dentro de Stocktin."
+          } > release-notes.md
+          cat release-notes.md
+      # Cada push a main publica una release; el link .../releases/latest/download/stocktin.apk
+      # siempre apunta a la última versión.
+      - name: Publish release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.${{ github.run_number }}
+          name: Stocktin 0.1.${{ github.run_number }}
+          # La etiqueta va en el commit que se compiló (si no, va a la rama por defecto del repo).
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: stocktin.apk
+          body_path: release-notes.md

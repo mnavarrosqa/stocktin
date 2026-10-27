@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Stocktin</string>
+    <string name="watchlist_widget_name">Lista de cotizaciones</string>
+    <string name="watchlist_widget_description">Tus acciones, índices y cripto con precio, cambio y gráfico del día</string>
+    <string name="ticker_widget_name">Un símbolo</string>
+    <string name="ticker_widget_description">Precio grande, cambio y gráfico del día de un símbolo</string>
+</resources>
