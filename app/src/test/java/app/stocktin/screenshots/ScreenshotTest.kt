@@ -89,7 +89,11 @@ class ScreenshotTest {
 
     /** Baja la lista hasta [symbol] (la tarjeta de la cartera lo puede dejar fuera de la pantalla) y lo abre. */
     private fun openSymbol(symbol: String) {
-        compose.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(symbol))
+        val list = compose.onAllNodes(hasScrollToNodeAction()).onFirst()
+        list.performScrollToNode(hasText(symbol))
+        // Queda pegado abajo, debajo de la barra flotante: se sube un poco más.
+        list.performTouchInput { swipeUp(startY = bottom * 0.6f, endY = bottom * 0.3f) }
+        settle()
         compose.onAllNodesWithText(symbol).onFirst().performClick()
     }
 
