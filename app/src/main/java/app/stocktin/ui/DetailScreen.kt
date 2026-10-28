@@ -39,6 +39,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +63,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.stocktin.data.ChartCompare
 import app.stocktin.data.ChartRange
 import app.stocktin.data.ExtSession
 import app.stocktin.data.Format
@@ -87,6 +89,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
     var listMenu by remember { mutableStateOf(false) }
     var alertSheet by remember(symbol) { mutableStateOf(false) }
     val allAlerts by viewModel.alerts.collectAsState()
+    val comparing by viewModel.compare.collectAsState()
     val alerts = allAlerts.filter { it.symbol == symbol }
     val holdings by viewModel.holdings.collectAsState()
     val holding = holdings[symbol]
@@ -168,6 +171,13 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
         val prices = chart?.prices.orEmpty()
         val range = state?.range ?: ChartRange.DAY
         val baseline = if (range == ChartRange.DAY) quote.previousClose ?: chart?.previousClose else prices.firstOrNull()
+        val benchmark = ChartCompare.benchmarkFor(symbol)
+        val start = baseline ?: prices.firstOrNull()
+        val overlay = if (comparing && chart != null && start != null) {
+            state?.benchmark?.let { other -> ChartCompare.overlay(chart, start, other, if (range == ChartRange.DAY) other.previousClose else null) }
+        } else {
+            null
+        }
         val top: @Composable (Dp) -> Unit = { chartHeight ->
             Header(quote, prices, chart?.timestamps.orEmpty(), range, baseline, selected)
             Spacer(Modifier.height(12.dp))
@@ -179,8 +189,19 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 selected = selected,
                 onSelect = { selected = it },
                 height = chartHeight,
+                compare = overlay,
             )
             RangeSelector(range) { viewModel.setRange(it) }
+            if (benchmark != null && prices.size >= 2 && start != null) {
+                CompareRow(
+                    symbol = symbol,
+                    benchmarkName = benchmark.second,
+                    enabled = comparing,
+                    symbolPercent = ChartCompare.percent(prices, start, selected),
+                    benchmarkPercent = overlay?.let { ChartCompare.percent(it, start, selected) },
+                    onToggle = { viewModel.setCompare(!comparing) },
+                )
+            }
         }
         if (tabletop && fold != null) {
             // Modo mesa: arriba de la bisagra el gráfico, abajo los datos.
@@ -289,6 +310,7 @@ private fun ChartBlock(
     selected: Int?,
     onSelect: (Int?) -> Unit,
     height: Dp,
+    compare: List<Double>? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     Box(Modifier.fillMaxWidth().height(height), contentAlignment = Alignment.Center) {
@@ -304,9 +326,51 @@ private fun ChartBlock(
                     onSelect(index)
                 },
                 modifier = Modifier.fillMaxSize(),
+                compare = compare,
             )
             loading -> CircularProgressIndicator()
             else -> Text(error ?: "Sin datos para este rango", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** El botón para comparar con el índice y, si está prendido, cuánto rindió cada uno en el rango. */
+@Composable
+private fun CompareRow(
+    symbol: String,
+    benchmarkName: String,
+    enabled: Boolean,
+    symbolPercent: Double?,
+    benchmarkPercent: Double?,
+    onToggle: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        FilterChip(
+            selected = enabled,
+            onClick = onToggle,
+            label = { Text("vs $benchmarkName") },
+            leadingIcon = if (enabled) ({ Icon(Icons.Filled.Check, null, Modifier.size(18.dp)) }) else null,
+        )
+        if (enabled && benchmarkPercent != null && symbolPercent != null) {
+            Column {
+                Text(
+                    "$symbol ${Format.percent(symbolPercent)}",
+                    style = MaterialTheme.typography.labelLarge.tabular(),
+                    color = changeColor(symbolPercent),
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "$benchmarkName ${Format.percent(benchmarkPercent)}",
+                    style = MaterialTheme.typography.labelLarge.tabular(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else if (enabled) {
+            Text("Cargando…", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

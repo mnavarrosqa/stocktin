@@ -43,8 +43,11 @@ fun PriceChart(
     selected: Int?,
     onSelect: (Int?) -> Unit,
     modifier: Modifier = Modifier,
+    /** Otra serie (ya en la misma escala) para comparar, en una línea fina. */
+    compare: List<Double>? = null,
 ) {
     val dash = MaterialColors.outline()
+    val compareColor = MaterialColors.onSurfaceVariant().copy(alpha = 0.8f)
     val guide = MaterialColors.onSurfaceVariant()
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = guide, fontFeatureSettings = "tnum")
@@ -68,8 +71,11 @@ fun PriceChart(
         },
     ) {
         if (prices.size < 2) return@Canvas
-        val point = drawSeries(prices, baseline, color, dash, strokeWidth = 2.dp.toPx(), selected = selected, guide = guide, labelSpace = 16.dp.toPx())
-        if (selected == null) {
+        val point = drawSeries(
+            prices, baseline, color, dash, strokeWidth = 2.dp.toPx(), selected = selected, guide = guide, labelSpace = 16.dp.toPx(),
+            extra = compare?.takeIf { it.size == prices.size }, extraColor = compareColor,
+        )
+        if (selected == null && compare == null) {
             // Máximo y mínimo del rango, como en la app Bolsa de Apple.
             val high = prices.indices.maxBy { prices[it] }
             val low = prices.indices.minBy { prices[it] }
@@ -93,9 +99,11 @@ private fun DrawScope.drawSeries(
     selected: Int?,
     guide: Color = dash,
     labelSpace: Float = 0f,
+    extra: List<Double>? = null,
+    extraColor: Color = dash,
 ): (Int) -> Offset {
-    var min = prices.min()
-    var max = prices.max()
+    var min = minOf(prices.min(), extra?.min() ?: Double.MAX_VALUE)
+    var max = maxOf(prices.max(), extra?.max() ?: -Double.MAX_VALUE)
     if (baseline != null) {
         min = minOf(min, baseline)
         max = maxOf(max, baseline)
@@ -132,8 +140,16 @@ private fun DrawScope.drawSeries(
             pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx())),
         )
     }
+    if (extra != null) {
+        val other = Path().apply {
+            moveTo(x(0), y(extra[0]))
+            for (i in 1 until extra.size) lineTo(x(i), y(extra[i]))
+        }
+        drawPath(other, extraColor, style = Stroke(width = strokeWidth * 0.75f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
     drawPath(line, color, style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
     if (selected != null && selected in prices.indices) {
+        if (extra != null) drawCircle(extraColor, radius = 4.dp.toPx(), center = Offset(x(selected), y(extra[selected])))
         val sx = x(selected)
         drawLine(guide, Offset(sx, 0f), Offset(sx, size.height), strokeWidth = 1.dp.toPx())
         drawCircle(color, radius = 5.dp.toPx(), center = Offset(sx, y(prices[selected])))

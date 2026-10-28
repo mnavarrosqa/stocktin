@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import app.stocktin.data.Alert
 import app.stocktin.data.Chart
 import app.stocktin.data.Format
+import app.stocktin.data.ChartCompare
 import app.stocktin.data.ChartRange
 import app.stocktin.data.MARKET_SYMBOLS
 import app.stocktin.data.Movers
@@ -22,6 +23,7 @@ import app.stocktin.update.Updater
 import app.stocktin.widget.RefreshScheduler
 import app.stocktin.widget.Widgets
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +64,8 @@ data class ChartState(
     val chart: Chart? = null,
     val loading: Boolean = true,
     val error: String? = null,
+    /** El índice de referencia en el mismo rango, si se está comparando. */
+    val benchmark: Chart? = null,
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -412,12 +416,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private val _compare = MutableStateFlow(false)
+    /** Comparar el gráfico del detalle con su índice (S&P 500 o Merval). */
+    val compare: StateFlow<Boolean> = _compare.asStateFlow()
+
+    fun setCompare(enabled: Boolean) {
+        _compare.value = enabled
+        val state = _chart.value ?: return
+        loadChart(state.symbol, state.range)
+    }
+
     private fun loadChart(symbol: String, range: ChartRange) {
         chartJob?.cancel()
-        _chart.value = ChartState(symbol, range, chart = _chart.value?.takeIf { it.symbol == symbol && it.range == range }?.chart)
+        val old = _chart.value?.takeIf { it.symbol == symbol && it.range == range }
+        _chart.value = ChartState(symbol, range, chart = old?.chart, benchmark = old?.benchmark)
+        val benchmark = ChartCompare.benchmarkFor(symbol)?.first?.takeIf { _compare.value }
         chartJob = viewModelScope.launch {
+            val other = benchmark?.let { async { runCatching { YahooApi.chart(it, range) }.getOrNull() } }
             _chart.value = runCatching { YahooApi.chart(symbol, range) }.fold(
-                onSuccess = { ChartState(symbol, range, it, loading = false) },
+                onSuccess = { ChartState(symbol, range, it, loading = false, benchmark = other?.await()) },
                 onFailure = { ChartState(symbol, range, null, loading = false, error = "No se pudo cargar el gráfico") },
             )
         }

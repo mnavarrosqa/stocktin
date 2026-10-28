@@ -118,6 +118,16 @@ class ScreenshotTest {
         shot("05_detalle_abajo")
     }
 
+    @Test
+    fun compare() {
+        launch()
+        compose.onNodeWithText("NVDA").performClick()
+        settle()
+        compose.onNodeWithText("vs S&P 500").performClick()
+        settle()
+        shot("04c_detalle_vs_sp500")
+    }
+
     @OptIn(ExperimentalRoborazziApi::class)
     @Test
     fun alert() {
