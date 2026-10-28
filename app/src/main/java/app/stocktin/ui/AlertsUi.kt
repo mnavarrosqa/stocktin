@@ -70,10 +70,10 @@ fun AlertsBlock(alerts: List<Alert>, quote: Quote, onNew: () -> Unit, onRemove: 
                 Icon(Icons.Filled.Notifications, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Alertas de precio", style = MaterialTheme.typography.titleSmall)
+                    Text("Alertas", style = MaterialTheme.typography.titleSmall)
                     if (alerts.isEmpty()) {
                         Text(
-                            "Te avisamos cuando llegue al precio que marques",
+                            "Te avisamos cuando llegue a un precio o se mueva mucho",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

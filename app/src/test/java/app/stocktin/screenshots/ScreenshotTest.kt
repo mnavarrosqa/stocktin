@@ -3,6 +3,8 @@ package app.stocktin.screenshots
 import android.content.Context
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -110,7 +112,7 @@ class ScreenshotTest {
     @Test
     fun detail() {
         launch()
-        compose.onNodeWithText("NVDA").performClick()
+        compose.onAllNodesWithText("NVDA").onFirst().performClick()
         settle()
         shot("04_detalle")
         compose.onRoot().performTouchInput { swipeUp() }
@@ -121,7 +123,7 @@ class ScreenshotTest {
     @Test
     fun compare() {
         launch()
-        compose.onNodeWithText("NVDA").performClick()
+        compose.onAllNodesWithText("NVDA").onFirst().performClick()
         settle()
         compose.onNodeWithText("vs S&P 500").performClick()
         settle()
@@ -132,7 +134,7 @@ class ScreenshotTest {
     @Test
     fun alert() {
         launch()
-        compose.onNodeWithText("NVDA").performClick()
+        compose.onAllNodesWithText("NVDA").onFirst().performClick()
         settle()
         compose.onNodeWithContentDescription("Nueva alerta de precio").performClick()
         settle()
@@ -163,7 +165,7 @@ class ScreenshotTest {
     @Config(qualifiers = UNFOLDED)
     fun unfolded() {
         launch()
-        compose.onNodeWithText("NVDA").performClick()
+        compose.onAllNodesWithText("NVDA").onFirst().performClick()
         settle()
         shot("08_desplegado")
     }
@@ -178,7 +180,7 @@ class ScreenshotTest {
         }
         settle()
         shot("09_fold_libro")
-        compose.onNodeWithText("NVDA").performClick()
+        compose.onAllNodesWithText("NVDA").onFirst().performClick()
         settle()
         shot("10_fold_libro_detalle")
     }
@@ -187,7 +189,7 @@ class ScreenshotTest {
     @Config(qualifiers = TABLET)
     fun tablet() {
         launch()
-        compose.onNodeWithText("NVDA").performClick()
+        compose.onAllNodesWithText("NVDA").onFirst().performClick()
         settle()
         shot("11_tablet")
     }

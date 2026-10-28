@@ -67,9 +67,14 @@ búsqueda al lado.
 - **Ordenar** por mayor suba, mayor baja o símbolo, y **deslizar una fila** para quitarla (con
   Deshacer). Los precios destellan en verde o rojo cuando cambian.
 - La búsqueda muestra tus búsquedas recientes y lo más buscado del día en Yahoo Finance.
-- **Alertas de precio:** en el detalle, la campana → un precio (o ±5 % / ±10 %) y Stocktin avisa
-  con una notificación cuando lo alcanza. Se revisan cada vez que se actualizan los precios (con la
-  app abierta o en segundo plano), suenan una vez y se borran. En Ajustes están todas juntas.
+- **Alertas:** en el detalle, la campana → "Llegue a un precio" (o ±5 % / ±10 %; suena una vez y
+  se borra) o "Se mueva mucho" (más de 3, 5 o 10 % en el día; suena una vez por día). Avisan con
+  una notificación y se revisan cada vez que se actualizan los precios. En Ajustes están todas.
+- **Cartera:** en el detalle, "Tu posición" → cantidad y precio promedio de compra. Arriba de las
+  listas aparece cuánto vale todo, cuánto cambió hoy y cuánto ganaste (separado por moneda).
+- **Comparar:** en el gráfico del detalle, "vs S&P 500" (o "vs Merval" para acciones argentinas)
+  dibuja el índice en la misma escala y muestra cuánto rindió cada uno en el rango.
+- **Compartir la app:** Ajustes → Acerca de → Compartir Stocktin manda el link de descarga.
 - El detalle trae las últimas **noticias** del símbolo y marca el máximo y el mínimo en el gráfico.
 - Con la app abierta los precios se actualizan cada 30 segundos.
 - Tocá la etiqueta de color para alternar entre porcentaje y dinero.

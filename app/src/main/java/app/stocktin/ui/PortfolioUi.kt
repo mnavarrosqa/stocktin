@@ -173,7 +173,7 @@ fun PositionBlock(holding: Holding?, quote: Quote, onEdit: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("Tu posición", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        if (holding == null) "Cargá cuántas tenés y ves cuánto ganás" else "${shares(holding.shares)} a ${Format.price(holding.cost)} promedio",
+                        if (holding == null) "Cargá cuántas tenés y ves cuánto ganás" else "${shares(holding.shares)} a ${Format.price(holding.cost)} de promedio",
                         style = MaterialTheme.typography.bodySmall.tabular(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

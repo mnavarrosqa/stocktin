@@ -138,7 +138,7 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
                 WidgetsRow()
             }
 
-            Section("Alertas de precio") {
+            Section("Alertas") {
                 AlertsSection(
                     alerts = alerts,
                     quotes = quotes,
