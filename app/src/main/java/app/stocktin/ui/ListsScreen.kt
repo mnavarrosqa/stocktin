@@ -71,6 +71,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.data.Format
 import app.stocktin.data.Portfolio
+import app.stocktin.data.SuggestedList
+import app.stocktin.data.Suggestions
 import app.stocktin.widget.WatchlistWidget
 
 /**
@@ -90,6 +92,7 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
     val sortMode by viewModel.sortMode.collectAsState()
     val holdings by viewModel.holdings.collectAsState()
     var portfolioSheet by remember { mutableStateOf(false) }
+    var openedSuggestion by remember { mutableStateOf<SuggestedList?>(null) }
     val list = lists.firstOrNull { it.id == currentId } ?: lists.first()
     var editing by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -284,6 +287,14 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                         }
                     }
                 }
+                if (!editing) {
+                    item(key = "ideas") {
+                        SuggestionsRow(Suggestions.available(lists), quotes) {
+                            openedSuggestion = it
+                            viewModel.previewSuggested(it)
+                        }
+                    }
+                }
             }
         }
     }
@@ -300,6 +311,21 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                 }
                 nameDialog = null
             },
+        )
+    }
+    openedSuggestion?.let { suggestion ->
+        SuggestionSheet(
+            list = suggestion,
+            quotes = quotes,
+            onAdd = {
+                openedSuggestion = null
+                viewModel.addSuggested(suggestion)
+            },
+            onOpenSymbol = {
+                openedSuggestion = null
+                viewModel.open(Screen.Detail(it))
+            },
+            onDismiss = { openedSuggestion = null },
         )
     }
     if (portfolioSheet) {

@@ -54,6 +54,9 @@ búsqueda al lado.
   que más sube, baja y se opera hoy, y secciones de índices, Argentina (Merval, ADRs y dólar),
   sectores de EE.UU. como mapa de calor, cripto, materias primas y monedas y tasas, con chips para
   saltar a cada una.
+- **Ideas para armar listas**: abajo de tu lista, listas armadas para agregar con un toque (las 7
+  magníficas, ADRs argentinos, panel líder, IA, cripto, ETFs, dividendos, materias primas y dólar
+  y tasas). Tocando una se ve qué trae y cómo viene hoy.
 - **Varias listas** (por ejemplo "USD", "Argentina", "Cripto"), con pestañas para pasar de una a otra.
 - **Búsqueda** por símbolo o nombre, con sugerencias (S&P 500, Nasdaq, Merval, Bitcoin, oro,
   dólar/peso…).

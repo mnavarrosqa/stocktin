@@ -98,8 +98,8 @@ class Repository private constructor(private val context: Context) {
         saveQuotes()
     }
 
-    fun createList(name: String): Watchlist {
-        val list = Watchlist(UUID.randomUUID().toString().take(8), name.trim().ifEmpty { "Lista" }, emptyList())
+    fun createList(name: String, symbols: List<String> = emptyList()): Watchlist {
+        val list = Watchlist(UUID.randomUUID().toString().take(8), name.trim().ifEmpty { "Lista" }, symbols.distinct())
         editLists { it + list }
         return list
     }

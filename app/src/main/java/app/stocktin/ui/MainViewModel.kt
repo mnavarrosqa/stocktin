@@ -16,6 +16,7 @@ import app.stocktin.data.Quote
 import app.stocktin.data.STRIP_SYMBOLS
 import app.stocktin.data.NewsItem
 import app.stocktin.data.SortMode
+import app.stocktin.data.SuggestedList
 import app.stocktin.data.Repository
 import app.stocktin.data.SearchResult
 import app.stocktin.data.Settings
@@ -328,6 +329,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val list = repository.createList(name)
         selectList(list.id)
         widgetsChanged()
+    }
+
+    /** Al abrir una lista sugerida: se traen sus cotizaciones para mostrarla. */
+    fun previewSuggested(list: SuggestedList) {
+        val missing = list.symbols.filter { repository.quotes.value[it] == null }
+        if (missing.isNotEmpty()) viewModelScope.launch { repository.refresh(missing) }
+    }
+
+    /** Arma una lista sugerida y la abre. */
+    fun addSuggested(list: SuggestedList) {
+        val created = repository.createList(list.name, list.symbols)
+        selectList(created.id)
+        widgetsChanged()
+        viewModelScope.launch { repository.refresh(list.symbols) }
+        showMessage("Listo: armamos \"${list.name}\" con ${list.symbols.size} símbolos")
     }
 
     fun renameList(id: String, name: String) {

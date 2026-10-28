@@ -105,6 +105,19 @@ class ScreenshotTest {
         shot("01_listas")
     }
 
+    @OptIn(ExperimentalRoborazziApi::class)
+    @Test
+    fun suggestions() {
+        launch()
+        compose.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText("Ideas para armar listas"))
+        compose.onAllNodes(hasScrollToNodeAction()).onFirst().performTouchInput { swipeUp(startY = bottom * 0.7f, endY = bottom * 0.35f) }
+        settle()
+        shot("01c_ideas_de_listas")
+        compose.onNodeWithText("Las 7 magníficas").performClick()
+        settle()
+        captureScreenRoboImage("screenshots/01d_lista_sugerida.png")
+    }
+
     @Test
     fun listsHiddenBalance() {
         launch()
