@@ -165,7 +165,8 @@ class ScreenshotTest {
     @Config(qualifiers = UNFOLDED)
     fun unfolded() {
         launch()
-        compose.onAllNodesWithText("NVDA").onFirst().performClick()
+        // Con la tarjeta de la cartera, NVDA queda fuera de la pantalla: se abre QQQ.
+        compose.onAllNodesWithText("QQQ").onFirst().performClick()
         settle()
         shot("08_desplegado")
     }
