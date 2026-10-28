@@ -152,7 +152,13 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
             )
         }
         if (alertSheet && quote != null) {
-            NewAlertSheet(symbol, quote.price, onCreate = { viewModel.addAlert(symbol, it) }, onDismiss = { alertSheet = false })
+            NewAlertSheet(
+                symbol = symbol,
+                price = quote.price,
+                onCreate = { viewModel.addAlert(symbol, it) },
+                onCreateMove = { viewModel.addMoveAlert(symbol, it) },
+                onDismiss = { alertSheet = false },
+            )
         }
         if (quote == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -191,7 +197,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 ) {
                     Stats(quote)
                     PositionBlock(holding, quote, onEdit = { holdingSheet = true })
-                    AlertsBlock(alerts, quote.price, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
+                    AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                     News(viewModel, symbol)
                 }
             }
@@ -205,7 +211,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 top(if (inPane) 320.dp else 260.dp)
                 Stats(quote)
                 PositionBlock(holding, quote, onEdit = { holdingSheet = true })
-                AlertsBlock(alerts, quote.price, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
+                AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                 News(viewModel, symbol)
                 Spacer(Modifier.height(24.dp))
             }

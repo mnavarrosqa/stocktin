@@ -3,22 +3,42 @@ package app.stocktin.data
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Aviso de precio: suena una sola vez, cuando [symbol] llega a [target] (subiendo si [above]). */
+/**
+ * Un aviso. De precio: suena una sola vez, cuando [symbol] llega a [target] (subiendo si [above]).
+ * De movimiento del día: [target] es un porcentaje y suena (una vez por día) cuando el símbolo sube o
+ * baja más que eso en el día.
+ */
 data class Alert(
     val id: String,
     val symbol: String,
     val target: Double,
     val above: Boolean,
     val created: Long,
+    val kind: AlertKind = AlertKind.PRICE,
+    /** Día (yyyy-MM-dd) en que sonó por última vez una alerta de movimiento. */
+    val lastFired: String? = null,
 )
+
+enum class AlertKind { PRICE, DAY_MOVE }
 
 object Alerts {
 
-    /** Las alertas que ya se cumplieron con estas cotizaciones. */
-    fun reached(alerts: List<Alert>, quotes: Map<String, Quote>): List<Pair<Alert, Quote>> =
+    /** Las alertas que se cumplieron con estas cotizaciones ([today] es yyyy-MM-dd). */
+    fun reached(
+        alerts: List<Alert>,
+        quotes: Map<String, Quote>,
+        today: String,
+        zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+    ): List<Pair<Alert, Quote>> =
         alerts.mapNotNull { alert ->
             val quote = quotes[alert.symbol] ?: return@mapNotNull null
-            val hit = if (alert.above) quote.price >= alert.target else quote.price <= alert.target
+            val hit = when (alert.kind) {
+                AlertKind.PRICE -> if (alert.above) quote.price >= alert.target else quote.price <= alert.target
+                // Solo con cotizaciones de hoy: con la bolsa cerrada sigue figurando el cambio de ayer.
+                AlertKind.DAY_MOVE -> alert.lastFired != today &&
+                    (quote.time == 0L || java.time.Instant.ofEpochSecond(quote.time).atZone(zone).toLocalDate().toString() == today) &&
+                    kotlin.math.abs(quote.changePercent) >= alert.target
+            }
             if (hit) alert to quote else null
         }
 
@@ -53,7 +73,9 @@ object Alerts {
                     .put("symbol", it.symbol)
                     .put("target", it.target)
                     .put("above", it.above)
-                    .put("created", it.created),
+                    .put("created", it.created)
+                    .put("kind", it.kind.name)
+                    .putOpt("lastFired", it.lastFired),
             )
         }
     }.toString()
@@ -63,7 +85,15 @@ object Alerts {
         return (0 until array.length()).mapNotNull { i ->
             runCatching {
                 val o = array.getJSONObject(i)
-                Alert(o.getString("id"), o.getString("symbol"), o.getDouble("target"), o.getBoolean("above"), o.optLong("created"))
+                Alert(
+                    id = o.getString("id"),
+                    symbol = o.getString("symbol"),
+                    target = o.getDouble("target"),
+                    above = o.getBoolean("above"),
+                    created = o.optLong("created"),
+                    kind = AlertKind.entries.firstOrNull { it.name == o.optString("kind") } ?: AlertKind.PRICE,
+                    lastFired = if (o.has("lastFired") && !o.isNull("lastFired")) o.getString("lastFired") else null,
+                )
             }.getOrNull()
         }
     }

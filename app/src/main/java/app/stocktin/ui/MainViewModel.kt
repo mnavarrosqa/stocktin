@@ -453,6 +453,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         showMessage("Te avisamos cuando $symbol ${if (alert.above) "suba" else "baje"} a ${Format.price(target)}")
     }
 
+    fun addMoveAlert(symbol: String, percent: Double) {
+        repository.addMoveAlert(symbol, percent)
+        showMessage("Te avisamos cuando $symbol se mueva más de ${Format.percent(percent).removePrefix("+")} en un día")
+    }
+
     fun removeAlert(alert: Alert) {
         repository.removeAlert(alert.id)
         _message.value = Message("Alerta de ${alert.symbol} borrada", "Deshacer") {

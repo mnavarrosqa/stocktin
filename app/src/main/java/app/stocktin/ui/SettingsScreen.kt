@@ -71,6 +71,7 @@ import app.stocktin.R
 import app.stocktin.alerts.AlertNotifier
 import app.stocktin.data.Alert
 import app.stocktin.data.Format
+import app.stocktin.data.Quote
 import app.stocktin.update.Release
 import app.stocktin.update.Updater
 import app.stocktin.widget.TickerWidgetReceiver
@@ -140,7 +141,7 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
             Section("Alertas de precio") {
                 AlertsSection(
                     alerts = alerts,
-                    prices = quotes.mapValues { it.value.price },
+                    quotes = quotes,
                     manualRefresh = minutes == 0,
                     canNotify = AlertNotifier.canNotify(context),
                     onOpen = { viewModel.open(Screen.Detail(it)) },
@@ -270,7 +271,7 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
 @Composable
 private fun AlertsSection(
     alerts: List<Alert>,
-    prices: Map<String, Double>,
+    quotes: Map<String, Quote>,
     manualRefresh: Boolean,
     canNotify: Boolean,
     onOpen: (String) -> Unit,
@@ -291,7 +292,7 @@ private fun AlertsSection(
     } else {
         Column(Modifier.padding(vertical = 4.dp)) {
             alerts.sortedBy { it.symbol }.forEach { alert ->
-                AlertRow(alert, prices[alert.symbol], showSymbol = true, onRemove = { onRemove(alert) }, onClick = { onOpen(alert.symbol) })
+                AlertRow(alert, quotes[alert.symbol], showSymbol = true, onRemove = { onRemove(alert) }, onClick = { onOpen(alert.symbol) })
             }
         }
     }

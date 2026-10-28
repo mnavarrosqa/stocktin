@@ -13,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import app.stocktin.R
 import app.stocktin.data.Alert
+import app.stocktin.data.AlertKind
 import app.stocktin.data.Format
 import app.stocktin.data.Quote
 import app.stocktin.ui.MainActivity
@@ -39,14 +40,24 @@ object AlertNotifier {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            val verb = if (alert.above) "subió a" else "bajó a"
+            val (title, text) = when (alert.kind) {
+                AlertKind.PRICE -> {
+                    val verb = if (alert.above) "subió a" else "bajó a"
+                    "${alert.symbol} $verb ${Format.price(quote.price)}" to
+                        "Tu alerta era ${Format.price(alert.target)}. Hoy ${Format.percent(quote.changePercent)} · ${quote.name}"
+                }
+                AlertKind.DAY_MOVE -> {
+                    val verb = if (quote.changePercent >= 0) "sube" else "baja"
+                    "${alert.symbol} $verb ${Format.percent(quote.changePercent).removePrefix("+").removePrefix("-")} hoy" to
+                        "Está a ${Format.price(quote.price)} · tu alerta era moverse más de ${Format.percent(alert.target).removePrefix("+")}"
+                }
+            }
             val notification = NotificationCompat.Builder(context, CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setColor(0xFF0F8A69.toInt())
-                .setContentTitle("${alert.symbol} $verb ${Format.price(quote.price)}")
-                .setContentText(
-                    "Tu alerta era ${Format.price(alert.target)}. Hoy ${Format.percent(quote.changePercent)} · ${quote.name}",
-                )
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(open)

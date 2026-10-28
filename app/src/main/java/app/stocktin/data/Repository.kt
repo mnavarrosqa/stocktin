@@ -135,17 +135,37 @@ class Repository private constructor(context: Context) {
         return alert
     }
 
+    /** Avisar cuando [symbol] se mueva más de [percent] % en el día. */
+    fun addMoveAlert(symbol: String, percent: Double): Alert {
+        val alert = Alert(
+            UUID.randomUUID().toString().take(8), symbol, percent, above = true, System.currentTimeMillis(), AlertKind.DAY_MOVE,
+        )
+        editAlerts { it + alert }
+        return alert
+    }
+
     /** Vuelve a poner una alerta borrada (Deshacer). */
     fun restoreAlert(alert: Alert) = editAlerts { alerts -> if (alerts.any { it.id == alert.id }) alerts else alerts + alert }
 
     fun removeAlert(id: String) = editAlerts { alerts -> alerts.filterNot { it.id == id } }
 
-    /** Saca y devuelve las alertas que se cumplieron con las últimas cotizaciones. */
-    fun takeReachedAlerts(): List<Pair<Alert, Quote>> {
-        val reached = Alerts.reached(_alerts.value, _quotes.value)
+    /**
+     * Devuelve las alertas que se cumplieron con las últimas cotizaciones: las de precio se borran y
+     * las de movimiento quedan marcadas para no volver a sonar hoy.
+     */
+    fun takeReachedAlerts(today: String = java.time.LocalDate.now().toString()): List<Pair<Alert, Quote>> {
+        val reached = Alerts.reached(_alerts.value, _quotes.value, today)
         if (reached.isNotEmpty()) {
             val ids = reached.map { it.first.id }.toSet()
-            editAlerts { alerts -> alerts.filterNot { it.id in ids } }
+            editAlerts { alerts ->
+                alerts.mapNotNull { a ->
+                    when {
+                        a.id !in ids -> a
+                        a.kind == AlertKind.DAY_MOVE -> a.copy(lastFired = today)
+                        else -> null
+                    }
+                }
+            }
         }
         return reached
     }
