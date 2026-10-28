@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -237,6 +238,10 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
             }
 
             Section("Acerca de") {
+                LinkRow(Icons.Filled.Share, "Compartir Stocktin", "Mandale el link de descarga a quien quieras") {
+                    runCatching { context.startActivity(Updater.shareIntent()) }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 LinkRow(Icons.Filled.Star, "Historial de versiones", "Qué trajo cada versión") { history = true }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 LinkRow(Icons.Filled.Info, "Código en GitHub", "github.com/mnavarrosqa/stocktin") {

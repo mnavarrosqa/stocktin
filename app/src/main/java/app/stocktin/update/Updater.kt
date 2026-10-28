@@ -2,7 +2,7 @@ package app.stocktin.update
 
 import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
+import Intent
 import android.net.Uri
 import android.content.pm.PackageInstaller
 import android.os.Build
@@ -167,6 +167,19 @@ class Updater(context: Context) {
         private const val APK_MIME = "application/vnd.android.package-archive"
         const val RELEASES_PAGE = "https://github.com/mnavarrosqa/stocktin/releases"
         const val REPO_PAGE = "https://github.com/mnavarrosqa/stocktin"
+        /** Siempre baja la última versión (para compartir la app). */
+        const val DOWNLOAD_URL = "https://github.com/mnavarrosqa/stocktin/releases/latest/download/stocktin.apk"
+
+        /** Lo que se manda al compartir la app. */
+        fun shareIntent(): Intent {
+            val text = "Te paso Stocktin, una app para seguir acciones, cripto y el dólar, con widgets para la " +
+                "pantalla de inicio y alertas de precio. Bajala desde el teléfono (Android 9 o más):\n$DOWNLOAD_URL"
+            val send = Intent(Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_SUBJECT, "Stocktin")
+                .putExtra(Intent.EXTRA_TEXT, text)
+            return Intent.createChooser(send, "Compartir Stocktin")
+        }
 
         /** Las versiones se publican como "v0.1.<versionCode>". */
         fun versionCodeOf(tag: String): Int? = Regex("(\\d+)$").find(tag)?.value?.toIntOrNull()
