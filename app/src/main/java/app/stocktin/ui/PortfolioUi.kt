@@ -312,7 +312,7 @@ fun PositionBlock(holding: Holding?, quote: Quote, weight: Double?, onEdit: () -
                 val tiles = listOfNotNull(
                     Tile("Cantidad") { TileValue(shownShares(holding.shares)) },
                     Tile("Precio promedio") { TileValue(Format.price(holding.cost)) },
-                    Tile("Hoy") { GainText(p.dayChange, p.dayPercent, MaterialTheme.typography.bodyMedium) },
+                    Tile("Hoy") { GainText(p.dayChange, p.dayPercent, MaterialTheme.typography.titleMedium) },
                     Tile("Costo total") { TileValue(shownMoney(p.costBasis, quote.currency)) },
                     weight?.let { w -> Tile("De tu cartera") { TileValue("${(w * 100).roundToInt()}%") } },
                 )
