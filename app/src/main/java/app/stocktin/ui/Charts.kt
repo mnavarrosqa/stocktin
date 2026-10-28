@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -13,12 +14,15 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import app.stocktin.data.ChartRange
+import app.stocktin.data.ChartScale
 import app.stocktin.data.Format
 
 /** Minigráfico de una fila de la lista. */
@@ -32,8 +36,10 @@ fun Sparkline(prices: List<Double>, baseline: Double?, color: Color, modifier: M
 }
 
 /**
- * Gráfico grande del detalle. Al apoyar y deslizar el dedo, [onSelect] avisa qué punto se está
- * mirando (null al soltar).
+ * Gráfico grande del detalle. La línea y el relleno son verdes por encima de [baseline] (el cierre
+ * anterior en 1D, o el primer precio del rango) y rojos por debajo, con una grilla suave de precios
+ * redondos a la derecha y horas o fechas abajo. Al apoyar y deslizar el dedo, [onSelect] avisa qué
+ * punto se está mirando (null al soltar).
  */
 @Composable
 fun PriceChart(
@@ -45,16 +51,39 @@ fun PriceChart(
     modifier: Modifier = Modifier,
     /** Otra serie (ya en la misma escala) para comparar, en una línea fina. */
     compare: List<Double>? = null,
+    timestamps: List<Long> = emptyList(),
+    range: ChartRange = ChartRange.DAY,
 ) {
     val dash = MaterialColors.outline()
-    val compareColor = MaterialColors.onSurfaceVariant().copy(alpha = 0.8f)
+    val grid = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
     val guide = MaterialColors.onSurfaceVariant()
+    val compareColor = guide.copy(alpha = 0.8f)
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = guide, fontFeatureSettings = "tnum")
+    val axisStyle = labelStyle.copy(color = guide.copy(alpha = 0.75f))
+    val extra = compare?.takeIf { it.size == prices.size }
+    val base = baseline ?: prices.firstOrNull()
+    // Los dos colores solo si la línea cruza la base; si no, el color de siempre.
+    val up = if (base != null && prices.any { it > base }) Up else color
+    val down = if (base != null && prices.any { it < base }) Down else color
+    var low = minOf(prices.minOrNull() ?: 0.0, extra?.minOrNull() ?: Double.MAX_VALUE, base ?: Double.MAX_VALUE)
+    var high = maxOf(prices.maxOrNull() ?: 0.0, extra?.maxOrNull() ?: -Double.MAX_VALUE, base ?: -Double.MAX_VALUE)
+    if (high - low < 1e-9) {
+        high += 1
+        low -= 1
+    }
+    val ticks = remember(low, high) { ChartScale.ticks(low, high) }
+    val times = remember(timestamps, range) { if (timestamps.size == prices.size) ChartScale.timeTicks(timestamps, range) else emptyList() }
+    val tickLabels = remember(ticks, labelStyle) { ticks.map { measurer.measure(Format.price(it), axisStyle) } }
+    val timeLabels = remember(times, labelStyle) { times.map { (i, text) -> i to measurer.measure(text, axisStyle) } }
+    // A la derecha, lugar para los precios de la grilla.
+    val gutter = (tickLabels.maxOfOrNull { it.size.width } ?: 0)
+
     Canvas(
-        modifier.pointerInput(prices) {
+        modifier.pointerInput(prices, gutter) {
             if (prices.size < 2) return@pointerInput
-            fun index(x: Float) = ((x / size.width) * (prices.size - 1)).toInt().coerceIn(0, prices.lastIndex)
+            val plotWidth = size.width - gutter - 8.dp.toPx()
+            fun index(x: Float) = ((x / plotWidth) * (prices.size - 1)).toInt().coerceIn(0, prices.lastIndex)
             awaitEachGesture {
                 val down = awaitFirstDown()
                 down.consume()
@@ -71,20 +100,87 @@ fun PriceChart(
         },
     ) {
         if (prices.size < 2) return@Canvas
-        val point = drawSeries(
-            prices, baseline, color, dash, strokeWidth = 2.dp.toPx(), selected = selected, guide = guide, labelSpace = 16.dp.toPx(),
-            extra = compare?.takeIf { it.size == prices.size }, extraColor = compareColor,
-        )
-        if (selected == null && compare == null) {
+        val stroke = 2.dp.toPx()
+        val right = size.width - gutter - 8.dp.toPx()
+        val bottomAxis = if (timeLabels.isEmpty()) 0f else (timeLabels.first().second.size.height + 6.dp.toPx())
+        val top = 18.dp.toPx()
+        val bottom = size.height - bottomAxis - 16.dp.toPx()
+        fun x(i: Int) = right * i / (prices.size - 1)
+        fun y(v: Double) = (top + (bottom - top) * (1 - (v - low) / (high - low))).toFloat()
+
+        // Grilla: líneas finas punteadas con el precio a la derecha.
+        ticks.forEachIndexed { i, tick ->
+            val ty = y(tick)
+            drawLine(grid, Offset(0f, ty), Offset(right, ty), strokeWidth = 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 4.dp.toPx())))
+            val label = tickLabels[i]
+            drawText(label, topLeft = Offset(size.width - label.size.width, ty - label.size.height / 2f))
+        }
+        // Abajo, las horas o fechas, con una marquita.
+        timeLabels.forEach { (i, label) ->
+            val tx = x(i)
+            drawLine(grid, Offset(tx, bottom + 8.dp.toPx()), Offset(tx, bottom + 12.dp.toPx()), strokeWidth = 1.dp.toPx())
+            val lx = (tx - label.size.width / 2f).coerceIn(0f, right - label.size.width)
+            drawText(label, topLeft = Offset(lx, size.height - label.size.height))
+        }
+
+        val line = Path().apply {
+            moveTo(x(0), y(prices[0]))
+            for (i in 1 until prices.size) lineTo(x(i), y(prices[i]))
+        }
+        val by = base?.let(::y) ?: bottom
+        // El relleno va de la línea hasta la base: arriba verde, abajo rojo, más intenso junto a la línea.
+        val area = Path().apply {
+            addPath(line)
+            lineTo(x(prices.lastIndex), by)
+            lineTo(0f, by)
+            close()
+        }
+        clipRect(left = 0f, top = 0f, right = right, bottom = by) {
+            drawPath(area, Brush.verticalGradient(listOf(up.copy(alpha = 0.30f), up.copy(alpha = 0.03f)), startY = top, endY = by))
+            drawPath(line, up, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        clipRect(left = 0f, top = by, right = right, bottom = size.height) {
+            drawPath(area, Brush.verticalGradient(listOf(down.copy(alpha = 0.03f), down.copy(alpha = 0.30f)), startY = by, endY = bottom))
+            drawPath(line, down, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        if (base != null) {
+            drawLine(dash, Offset(0f, by), Offset(right, by), strokeWidth = 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx())))
+        }
+        if (extra != null) {
+            val other = Path().apply {
+                moveTo(x(0), y(extra[0]))
+                for (i in 1 until extra.size) lineTo(x(i), y(extra[i]))
+            }
+            drawPath(other, compareColor, style = Stroke(width = stroke * 0.75f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        // El último precio: un punto con un halo.
+        if (selected == null) {
+            val last = Offset(x(prices.lastIndex), y(prices.last()))
+            val lastColor = if (base != null && prices.last() < base) down else up
+            drawCircle(lastColor.copy(alpha = 0.18f), radius = 9.dp.toPx(), center = last)
+            drawCircle(lastColor, radius = 4.dp.toPx(), center = last)
+        }
+        if (selected != null && selected in prices.indices) {
+            val sx = x(selected)
+            val sy = y(prices[selected])
+            val dot = if (base != null && prices[selected] < base) down else up
+            drawLine(guide, Offset(sx, 0f), Offset(sx, bottom), strokeWidth = 1.dp.toPx())
+            if (extra != null) drawCircle(compareColor, radius = 4.dp.toPx(), center = Offset(sx, y(extra[selected])))
+            drawCircle(dot, radius = 6.dp.toPx(), center = Offset(sx, sy))
+            drawCircle(Color.White, radius = 2.5.dp.toPx(), center = Offset(sx, sy))
+        }
+        if (selected == null && extra == null) {
             // Máximo y mínimo del rango, como en la app Bolsa de Apple.
-            val high = prices.indices.maxBy { prices[it] }
-            val low = prices.indices.minBy { prices[it] }
-            listOf(high to true, low to false).distinctBy { it.first }.forEach { (index, above) ->
+            val hi = prices.indices.maxBy { prices[it] }
+            val lo = prices.indices.minBy { prices[it] }
+            listOf(hi to true, lo to false).distinctBy { it.first }.forEach { (index, above) ->
                 val text = measurer.measure(Format.price(prices[index]), labelStyle)
-                val p = point(index)
-                val x = (p.x - text.size.width / 2f).coerceIn(0f, size.width - text.size.width)
-                val y = if (above) p.y - text.size.height - 4.dp.toPx() else p.y + 4.dp.toPx()
-                drawText(text, topLeft = Offset(x, y.coerceIn(0f, size.height - text.size.height)))
+                val p = Offset(x(index), y(prices[index]))
+                val tx = (p.x - text.size.width / 2f).coerceIn(0f, right - text.size.width)
+                val ty = if (above) p.y - text.size.height - 4.dp.toPx() else p.y + 4.dp.toPx()
+                drawText(text, topLeft = Offset(tx, ty.coerceIn(0f, size.height - text.size.height)))
             }
         }
     }

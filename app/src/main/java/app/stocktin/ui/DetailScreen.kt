@@ -190,6 +190,8 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 onSelect = { selected = it },
                 height = chartHeight,
                 compare = overlay,
+                timestamps = chart?.timestamps.orEmpty(),
+                range = range,
             )
             RangeSelector(range) { viewModel.setRange(it) }
             if (benchmark != null && prices.size >= 2 && start != null) {
@@ -311,6 +313,8 @@ private fun ChartBlock(
     onSelect: (Int?) -> Unit,
     height: Dp,
     compare: List<Double>? = null,
+    timestamps: List<Long> = emptyList(),
+    range: ChartRange = ChartRange.DAY,
 ) {
     val haptics = LocalHapticFeedback.current
     Box(Modifier.fillMaxWidth().height(height), contentAlignment = Alignment.Center) {
@@ -327,6 +331,8 @@ private fun ChartBlock(
                 },
                 modifier = Modifier.fillMaxSize(),
                 compare = compare,
+                timestamps = timestamps,
+                range = range,
             )
             loading -> CircularProgressIndicator()
             else -> Text(error ?: "Sin datos para este rango", color = MaterialTheme.colorScheme.onSurfaceVariant)
