@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.data.Agenda
 import app.stocktin.data.AgendaEvent
+import app.stocktin.data.AgendaInfo
 import app.stocktin.data.Format
 import app.stocktin.data.MARKET_SECTIONS
 import app.stocktin.data.MarketHours
@@ -83,10 +84,18 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
     val now by viewModel.now.collectAsState()
     val agenda by viewModel.agenda.collectAsState()
     var agendaSheet by remember { mutableStateOf(false) }
+    var openedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
+    val eventNews by viewModel.eventNews.collectAsState()
     val upcoming = remember(agenda, now / 60_000) { Agenda.upcoming(agenda, now, days = 30) }
+    // Un balance abre el símbolo; lo demás, la hoja del evento.
     val openEvent: (AgendaEvent) -> Unit = { event ->
         agendaSheet = false
-        event.symbol?.let { viewModel.open(Screen.Detail(it)) }
+        if (event.symbol != null) {
+            viewModel.open(Screen.Detail(event.symbol))
+        } else {
+            openedEvent = event
+            viewModel.openEvent(event)
+        }
     }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val grid = rememberLazyGridState()
@@ -172,6 +181,19 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
     }
     if (agendaSheet) {
         AgendaSheet(upcoming, now, openEvent) { agendaSheet = false }
+    }
+    openedEvent?.let { event ->
+        EventSheet(
+            event = event,
+            now = now,
+            quotes = quotes,
+            news = eventNews?.takeIf { it.first == AgendaInfo.newsQuery(event) }?.second,
+            onOpenSymbol = {
+                openedEvent = null
+                viewModel.open(Screen.Detail(it))
+            },
+            onDismiss = { openedEvent = null },
+        )
     }
 }
 

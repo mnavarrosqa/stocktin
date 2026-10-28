@@ -69,6 +69,7 @@ import app.stocktin.data.ExtSegment
 import app.stocktin.data.ExtendedHours
 import app.stocktin.data.ExtSession
 import app.stocktin.data.Format
+import app.stocktin.data.NewsItem
 import app.stocktin.data.Quote
 import java.time.Instant
 import java.time.ZoneId
@@ -516,7 +517,6 @@ private fun pointTime(epochSeconds: Long, range: ChartRange): String {
 private fun News(viewModel: MainViewModel, symbol: String) {
     val news by viewModel.news.collectAsState()
     val items = news?.takeIf { it.first == symbol }?.second
-    val uri = LocalUriHandler.current
     Column(Modifier.padding(horizontal = 16.dp)) {
         Text(
             "Noticias",
@@ -534,43 +534,48 @@ private fun News(viewModel: MainViewModel, symbol: String) {
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(start = 4.dp),
             )
-            else -> items.forEach { item ->
-                Surface(
-                    onClick = { runCatching { uri.openUri(item.link) } },
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.Transparent,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(Modifier.padding(vertical = 8.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                item.title,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                listOf(item.publisher, timeAgo(item.time)).filter { it.isNotBlank() }.joinToString(" · "),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp),
-                            )
-                        }
-                        if (item.thumbnail != null) {
-                            Spacer(Modifier.width(12.dp))
-                            AsyncImage(
-                                model = item.thumbnail,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                            )
-                        }
-                    }
-                }
+            else -> items.forEach { NewsItemRow(it) }
+        }
+    }
+}
+
+/** Una noticia: título, fuente, hace cuánto y la foto; tocarla la abre en el navegador. */
+@Composable
+fun NewsItemRow(item: NewsItem) {
+    val uri = LocalUriHandler.current
+    Surface(
+        onClick = { runCatching { uri.openUri(item.link) } },
+        shape = RoundedCornerShape(16.dp),
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(vertical = 8.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    item.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    listOf(item.publisher, timeAgo(item.time)).filter { it.isNotBlank() }.joinToString(" · "),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            if (item.thumbnail != null) {
+                Spacer(Modifier.width(12.dp))
+                AsyncImage(
+                    model = item.thumbnail,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                )
             }
         }
     }

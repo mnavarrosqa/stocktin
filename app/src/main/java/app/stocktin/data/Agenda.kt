@@ -90,3 +90,49 @@ object Agenda {
         return events.filter { Instant.ofEpochMilli(it.time).atZone(zone).toLocalDate() == today && it.key !in notified }
     }
 }
+
+/** Para la hoja de un evento: qué es, por qué importa, qué mirar y qué buscar en las noticias. */
+object AgendaInfo {
+
+    fun explain(event: AgendaEvent): String = when (event.kind) {
+        AgendaKind.FED ->
+            "La Reserva Federal decide la tasa de interés de referencia de EE.UU. Primero sale el comunicado y " +
+                "media hora después habla el presidente de la Fed. Si la tasa sube, baja o se mantiene (y lo que " +
+                "insinúen para las próximas reuniones) mueve a las acciones, los bonos, el dólar y el cripto." +
+                if (event.detail != null) " Esta reunión trae proyecciones económicas: dónde cree la Fed que van a estar las tasas, la inflación y el desempleo." else ""
+        AgendaKind.CPI ->
+            "El índice de precios al consumidor (CPI) mide cuánto subieron los precios en EE.UU. en el mes. Lo que más " +
+                "se mira es la inflación \"núcleo\", sin alimentos ni energía. Si sale más alta de lo esperado, el " +
+                "mercado espera tasas altas por más tiempo y las acciones suelen bajar; si sale más baja, al revés."
+        AgendaKind.JOBS ->
+            "El informe de empleo dice cuántos puestos de trabajo se crearon en el mes (las \"nóminas no agrícolas\"), " +
+                "la tasa de desempleo y cuánto subieron los salarios. Un mercado laboral muy fuerte puede demorar las " +
+                "bajas de tasas; uno muy débil hace temer una recesión."
+        AgendaKind.GDP ->
+            "El PBI mide cuánto creció la economía de EE.UU. en el trimestre (anualizado). Se publica en tres " +
+                "estimaciones: la primera es la que más mueve al mercado. Un crecimiento fuerte es bueno para las " +
+                "ganancias de las empresas, pero también puede mantener altas las tasas."
+        AgendaKind.EARNINGS ->
+            "La empresa presenta sus resultados del trimestre: ventas, ganancia por acción y lo que espera para " +
+                "adelante. El precio suele moverse fuerte si los números o las proyecciones sorprenden frente a lo " +
+                "que esperaban los analistas."
+        AgendaKind.OTHER -> "Un dato económico de EE.UU. que puede mover al mercado."
+    }
+
+    /** Qué mirar cuando sale: símbolo y nombre. */
+    fun watch(event: AgendaEvent): List<Pair<String, String>> = when (event.kind) {
+        AgendaKind.EARNINGS -> listOfNotNull(event.symbol?.let { it to (event.detail ?: it) }, "^GSPC" to "S&P 500")
+        AgendaKind.FED -> listOf("^GSPC" to "S&P 500", "^TNX" to "Bono 10 años", "DX-Y.NYB" to "Índice dólar", "BTC-USD" to "Bitcoin")
+        else -> listOf("^GSPC" to "S&P 500", "^NDX" to "Nasdaq 100", "^TNX" to "Bono 10 años", "DX-Y.NYB" to "Índice dólar")
+    }
+
+    /** Qué buscar en las noticias de Yahoo. */
+    fun newsQuery(event: AgendaEvent): String = when (event.kind) {
+        AgendaKind.FED -> "Federal Reserve interest rate decision"
+        AgendaKind.CPI -> "CPI inflation report"
+        AgendaKind.JOBS -> "jobs report nonfarm payrolls"
+        AgendaKind.GDP -> "US GDP report"
+        AgendaKind.EARNINGS -> event.symbol ?: event.title
+        AgendaKind.OTHER -> event.title
+    }
+}

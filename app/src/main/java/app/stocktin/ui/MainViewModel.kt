@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.stocktin.data.AgendaEvent
+import app.stocktin.data.AgendaInfo
 import app.stocktin.data.Alert
 import app.stocktin.data.Chart
 import app.stocktin.data.Format
@@ -92,6 +93,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _agendaNotifications = MutableStateFlow(settings.agendaNotifications)
     val agendaNotifications: StateFlow<Boolean> = _agendaNotifications.asStateFlow()
+
+    private val _eventNews = MutableStateFlow<Pair<String, List<NewsItem>?>?>(null)
+    /** Las noticias del evento de la agenda que está abierto (la búsqueda y sus resultados). */
+    val eventNews: StateFlow<Pair<String, List<NewsItem>?>?> = _eventNews.asStateFlow()
+
+    /** Al abrir un evento de la agenda: sus noticias y las cotizaciones de lo que conviene mirar. */
+    fun openEvent(event: AgendaEvent) {
+        val query = AgendaInfo.newsQuery(event)
+        val symbols = AgendaInfo.watch(event).map { it.first }
+        viewModelScope.launch { repository.refresh(symbols) }
+        if (_eventNews.value?.first == query && _eventNews.value?.second != null) return
+        _eventNews.value = query to null
+        viewModelScope.launch {
+            _eventNews.value = query to runCatching { YahooApi.news(query) }.getOrDefault(emptyList())
+        }
+    }
 
     fun setAgendaNotifications(enabled: Boolean) {
         settings.agendaNotifications = enabled

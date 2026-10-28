@@ -121,6 +121,19 @@ class ScreenshotTest {
         shot("05_detalle_abajo")
     }
 
+    @OptIn(ExperimentalRoborazziApi::class)
+    @Test
+    fun agendaEvent() {
+        launch()
+        compose.onNodeWithContentDescription("Mercados").performClick()
+        settle()
+        // El primer evento de la agenda que no sea un balance (depende del día en que corre).
+        val label = listOf("Empleo", "Inflación", "PBI", "Fed").first { compose.onAllNodesWithText(it).fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodesWithText(label).onFirst().performClick()
+        settle()
+        captureScreenRoboImage("screenshots/03c_evento_agenda.png")
+    }
+
     @Test
     fun compare() {
         launch()
