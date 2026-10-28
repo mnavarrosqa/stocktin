@@ -2,7 +2,7 @@ package app.stocktin.update
 
 import android.app.PendingIntent
 import android.content.Context
-import Intent
+import android.content.Intent
 import android.net.Uri
 import android.content.pm.PackageInstaller
 import android.os.Build
