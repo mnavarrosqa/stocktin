@@ -3,7 +3,11 @@ package app.stocktin.screenshots
 import android.content.Context
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -84,6 +88,12 @@ class ScreenshotTest {
         compose.waitForIdle()
     }
 
+    /** Baja la lista hasta [symbol] (la tarjeta de la cartera lo puede dejar fuera de la pantalla) y lo abre. */
+    private fun openSymbol(symbol: String) {
+        compose.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText(symbol))
+        compose.onAllNodesWithText(symbol).onFirst().performClick()
+    }
+
     private fun shot(name: String) = compose.onRoot().captureRoboImage("screenshots/$name.png")
 
     @Test
@@ -124,7 +134,7 @@ class ScreenshotTest {
     @Test
     fun detail() {
         launch()
-        compose.onAllNodesWithText("NVDA").onFirst().performClick()
+        openSymbol("NVDA")
         settle()
         shot("04_detalle")
         compose.onRoot().performTouchInput { swipeUp() }
@@ -148,7 +158,7 @@ class ScreenshotTest {
     @Test
     fun compare() {
         launch()
-        compose.onAllNodesWithText("NVDA").onFirst().performClick()
+        openSymbol("NVDA")
         settle()
         compose.onNodeWithText("vs S&P 500").performClick()
         settle()
@@ -159,7 +169,7 @@ class ScreenshotTest {
     @Test
     fun alert() {
         launch()
-        compose.onAllNodesWithText("NVDA").onFirst().performClick()
+        openSymbol("NVDA")
         settle()
         compose.onNodeWithContentDescription("Nueva alerta de precio").performClick()
         settle()
@@ -190,8 +200,7 @@ class ScreenshotTest {
     @Config(qualifiers = UNFOLDED)
     fun unfolded() {
         launch()
-        // Con la tarjeta de la cartera, NVDA queda fuera de la pantalla: se abre QQQ.
-        compose.onAllNodesWithText("QQQ").onFirst().performClick()
+        openSymbol("QQQ")
         settle()
         shot("08_desplegado")
     }
@@ -206,7 +215,7 @@ class ScreenshotTest {
         }
         settle()
         shot("09_fold_libro")
-        compose.onAllNodesWithText("NVDA").onFirst().performClick()
+        openSymbol("NVDA")
         settle()
         shot("10_fold_libro_detalle")
     }
@@ -215,7 +224,7 @@ class ScreenshotTest {
     @Config(qualifiers = TABLET)
     fun tablet() {
         launch()
-        compose.onAllNodesWithText("NVDA").onFirst().performClick()
+        openSymbol("NVDA")
         settle()
         shot("11_tablet")
     }
