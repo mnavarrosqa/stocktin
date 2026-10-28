@@ -200,7 +200,7 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                 }
                 if (holdings.isNotEmpty()) {
                     item(key = "portfolio") {
-                        PortfolioCard(Portfolio.totals(holdings.values, quotes), onToggleHidden = viewModel::toggleHideBalance) { portfolioSheet = true }
+                        PortfolioCard(holdings.values, quotes, onToggleHidden = viewModel::toggleHideBalance) { portfolioSheet = true }
                     }
                 }
                 item(key = "chips") {

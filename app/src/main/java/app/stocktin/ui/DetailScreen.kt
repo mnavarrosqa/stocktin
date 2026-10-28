@@ -70,6 +70,7 @@ import app.stocktin.data.ExtendedHours
 import app.stocktin.data.ExtSession
 import app.stocktin.data.Format
 import app.stocktin.data.NewsItem
+import app.stocktin.data.Portfolio
 import app.stocktin.data.Quote
 import java.time.Instant
 import java.time.ZoneId
@@ -226,7 +227,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                         .verticalScroll(rememberScrollState()),
                 ) {
                     Stats(quote)
-                    PositionBlock(holding, quote, onEdit = { holdingSheet = true }, onToggleHidden = viewModel::toggleHideBalance)
+                    PositionBlock(holding, quote, Portfolio.weight(symbol, holdings.values, quotes), onEdit = { holdingSheet = true }, onToggleHidden = viewModel::toggleHideBalance)
                     AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                     News(viewModel, symbol)
                 }
@@ -240,7 +241,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
             ) {
                 top(if (inPane) 320.dp else 260.dp)
                 Stats(quote)
-                PositionBlock(holding, quote, onEdit = { holdingSheet = true }, onToggleHidden = viewModel::toggleHideBalance)
+                PositionBlock(holding, quote, Portfolio.weight(symbol, holdings.values, quotes), onEdit = { holdingSheet = true }, onToggleHidden = viewModel::toggleHideBalance)
                 AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                 News(viewModel, symbol)
                 Spacer(Modifier.height(24.dp))

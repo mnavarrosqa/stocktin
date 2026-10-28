@@ -46,3 +46,21 @@ class PortfolioTest {
         assertEquals(holdings, Portfolio.fromJson(Portfolio.toJson(holdings)))
     }
 }
+
+class PortfolioAllocationTest {
+
+    private fun q(symbol: String, price: Double, currency: String = "USD") = Quote(symbol, symbol, price, 0.0, 0.0, null, currency, null)
+
+    @Test
+    fun `reparto de la cartera por moneda y con otros`() {
+        val holdings = listOf(Holding("A", 6.0, 1.0), Holding("B", 3.0, 1.0), Holding("C", 1.0, 1.0), Holding("ARS", 100.0, 1.0))
+        val quotes = mapOf("A" to q("A", 10.0), "B" to q("B", 10.0), "C" to q("C", 10.0), "ARS" to q("ARS", 10.0, "ARS"))
+        assertEquals(listOf("A" to 0.6, "B" to 0.3, "C" to 0.1), Portfolio.allocation(holdings, quotes, "USD"))
+        val grouped = Portfolio.allocation(holdings, quotes, "USD", max = 2)
+        assertEquals(listOf("A", "Otros"), grouped.map { it.first })
+        assertEquals(0.4, grouped[1].second, 1e-9)
+        assertEquals(0.3, Portfolio.weight("B", holdings, quotes)!!, 1e-9)
+        // Solo en su moneda, y si es lo único que hay no tiene sentido.
+        assertEquals(null, Portfolio.weight("ARS", holdings, quotes))
+    }
+}

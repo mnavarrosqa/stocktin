@@ -1,6 +1,19 @@
 package app.stocktin.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -95,17 +108,75 @@ private fun GainText(value: Double, percent: Double, style: androidx.compose.ui.
     )
 }
 
-/** Arriba de las listas: cuánto vale la cartera, cuánto cambió hoy y cuánto ganaste en total. */
+/** Los colores del reparto de la cartera, en orden. */
 @Composable
-fun PortfolioCard(totals: List<PortfolioTotal>, onToggleHidden: () -> Unit, onClick: () -> Unit) {
+private fun allocationColors(): List<Color> = listOf(
+    MaterialTheme.colorScheme.primary,
+    MaterialTheme.colorScheme.tertiary,
+    Color(0xFFE0A100),
+    Color(0xFF26A69A),
+    MaterialTheme.colorScheme.outline,
+)
+
+/** "▲ +56.77 (+1.33%) hoy" en una pastilla verde o roja. */
+@Composable
+private fun GainPill(value: Double, percent: Double, suffix: String) {
+    val color = changeColor(value)
+    Surface(shape = RoundedCornerShape(50), color = color.copy(alpha = 0.14f), contentColor = color) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (value >= 0) "▲" else "▼", style = MaterialTheme.typography.labelSmall)
+            Spacer(Modifier.width(6.dp))
+            Text(
+                (if (LocalHideBalance.current) Format.percent(percent) else "${Format.change(value)} (${Format.percent(percent)})") + " $suffix",
+                style = MaterialTheme.typography.labelLarge.tabular(),
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+/** La barra con el peso de cada símbolo y, abajo, quién es quién. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AllocationBar(allocation: List<Pair<String, Double>>) {
+    if (allocation.size < 2) return
+    val colors = allocationColors()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            allocation.forEachIndexed { i, (_, share) ->
+                Box(Modifier.weight(share.toFloat().coerceAtLeast(0.01f)).fillMaxHeight().background(colors[i % colors.size]))
+            }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            allocation.forEachIndexed { i, (symbol, share) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(colors[i % colors.size]))
+                    Spacer(Modifier.width(5.dp))
+                    Text("$symbol ${(share * 100).roundToInt()}%", style = MaterialTheme.typography.labelMedium.tabular())
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Arriba de las listas: cuánto vale la cartera, cuánto cambió hoy, cuánto ganaste en total y cómo
+ * se reparte. Con dólares y pesos, la moneda con más valor va grande y las demás en una línea.
+ */
+@Composable
+fun PortfolioCard(holdings: Collection<Holding>, quotes: Map<String, Quote>, onToggleHidden: () -> Unit, onClick: () -> Unit) {
+    val totals = Portfolio.totals(holdings, quotes)
+    val background = Brush.linearGradient(
+        listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)),
+    )
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = RoundedCornerShape(28.dp),
+        color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
     ) {
-        Column(Modifier.padding(start = 20.dp, end = 16.dp, top = 6.dp, bottom = 16.dp)) {
+        Column(Modifier.background(background).padding(start = 20.dp, end = 12.dp, top = 6.dp, bottom = 18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(painterResource(R.drawable.ic_wallet), null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -113,21 +184,32 @@ fun PortfolioCard(totals: List<PortfolioTotal>, onToggleHidden: () -> Unit, onCl
                 HideBalanceButton(onToggleHidden)
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
             }
-            if (totals.isEmpty()) {
-                Text("Esperando cotizaciones…", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+            val main = totals.firstOrNull()
+            if (main == null) {
+                Text("Esperando cotizaciones…", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                return@Column
             }
-            totals.forEach { total ->
-                val p = total.position
-                Spacer(Modifier.height(6.dp))
-                Text(shownMoney(p.value, total.currency), style = MaterialTheme.typography.headlineMedium.tabular(), fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            val p = main.position
+            Column(Modifier.padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(shownMoney(p.value, main.currency), style = MaterialTheme.typography.headlineLarge.tabular(), fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    GainPill(p.dayChange, p.dayPercent, "hoy")
+                    Spacer(Modifier.width(12.dp))
                     Column {
-                        Text("Hoy", style = MaterialTheme.typography.labelMedium)
-                        GainText(p.dayChange, p.dayPercent, MaterialTheme.typography.bodyMedium)
+                        Text("Ganancia total", style = MaterialTheme.typography.labelSmall)
+                        GainText(p.gain, p.gainPercent, MaterialTheme.typography.labelLarge)
                     }
-                    Column {
-                        Text("Total", style = MaterialTheme.typography.labelMedium)
-                        GainText(p.gain, p.gainPercent, MaterialTheme.typography.bodyMedium)
+                }
+                AllocationBar(Portfolio.allocation(holdings, quotes, main.currency))
+                totals.drop(1).forEach { other ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(shownMoney(other.position.value, other.currency), style = MaterialTheme.typography.titleSmall.tabular(), fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "hoy ${Format.percent(other.position.dayPercent)}",
+                            style = MaterialTheme.typography.labelMedium.tabular(),
+                            color = changeColor(other.position.dayChange),
+                        )
                     }
                 }
             }
@@ -190,41 +272,54 @@ fun PortfolioSheet(holdings: Collection<Holding>, quotes: Map<String, Quote>, on
     }
 }
 
-/** En el detalle: lo que tenés de este símbolo, o el botón para cargarlo. */
+/**
+ * En el detalle: lo que tenés de este símbolo. Arriba cuánto vale y cuánto ganaste; después dónde
+ * quedó tu precio promedio en el rango del año, y los números en cajitas. Sin posición, el botón
+ * para cargarla.
+ */
 @Composable
-fun PositionBlock(holding: Holding?, quote: Quote, onEdit: () -> Unit, onToggleHidden: () -> Unit) {
+fun PositionBlock(holding: Holding?, quote: Quote, weight: Double?, onEdit: () -> Unit, onToggleHidden: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
-        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 12.dp)) {
+        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(painterResource(R.drawable.ic_wallet), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Tu posición", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        if (holding == null) "Cargá cuántas tenés y ves cuánto ganás" else "${shownShares(holding.shares)} a ${Format.price(holding.cost)} de promedio",
-                        style = MaterialTheme.typography.bodySmall.tabular(),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (holding == null) {
+                        Text(
+                            "Cargá cuántas tenés y ves cuánto ganás",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 if (holding != null) HideBalanceButton(onToggleHidden, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (holding == null) OutlinedButton(onClick = onEdit) { Text("Cargar") } else TextButton(onClick = onEdit) { Text("Editar") }
             }
-            if (holding != null) {
-                val p = Portfolio.position(holding, quote)
-                Row(Modifier.padding(top = 10.dp, end = 8.dp)) {
-                    PositionStat("Valor", Modifier.weight(1f)) {
-                        Text(shownMoney(p.value, quote.currency), style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.SemiBold)
-                    }
-                    PositionStat("Hoy", Modifier.weight(1f)) { GainText(p.dayChange, p.dayPercent, MaterialTheme.typography.bodyMedium) }
+            if (holding == null) return@Column
+            val p = Portfolio.position(holding, quote)
+            Column(Modifier.padding(end = 8.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(shownMoney(p.value, quote.currency), style = MaterialTheme.typography.headlineMedium.tabular(), fontWeight = FontWeight.Bold)
+                GainPill(p.gain, p.gainPercent, "desde que compraste")
+                if (quote.yearLow != null && quote.yearHigh != null && quote.yearHigh > quote.yearLow) {
+                    CostInRange(holding.cost, quote.price, quote.yearLow, quote.yearHigh)
                 }
-                Row(Modifier.padding(top = 8.dp, end = 8.dp)) {
-                    PositionStat("Ganancia total", Modifier.weight(1f)) { GainText(p.gain, p.gainPercent, MaterialTheme.typography.bodyMedium) }
-                    PositionStat("Costo", Modifier.weight(1f)) {
-                        Text(shownMoney(p.costBasis, quote.currency), style = MaterialTheme.typography.bodyMedium.tabular())
+                val tiles = listOfNotNull(
+                    Tile("Cantidad") { TileValue(shownShares(holding.shares)) },
+                    Tile("Precio promedio") { TileValue(Format.price(holding.cost)) },
+                    Tile("Hoy") { GainText(p.dayChange, p.dayPercent, MaterialTheme.typography.bodyMedium) },
+                    Tile("Costo total") { TileValue(shownMoney(p.costBasis, quote.currency)) },
+                    weight?.let { w -> Tile("De tu cartera") { TileValue("${(w * 100).roundToInt()}%") } },
+                )
+                tiles.chunked(2).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { tile -> StatTile(tile.label, Modifier.weight(1f), tile.content) }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
@@ -232,11 +327,64 @@ fun PositionBlock(holding: Holding?, quote: Quote, onEdit: () -> Unit, onToggleH
     }
 }
 
+/** Una cajita de "Tu posición": el nombre y lo que va adentro. */
+private class Tile(val label: String, val content: @Composable () -> Unit)
+
 @Composable
-private fun PositionStat(label: String, modifier: Modifier, value: @Composable () -> Unit) {
-    Column(modifier) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        value()
+private fun TileValue(text: String) {
+    Text(text, style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.SemiBold, maxLines = 1)
+}
+
+@Composable
+private fun StatTile(label: String, modifier: Modifier, value: @Composable () -> Unit) {
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = modifier) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            value()
+        }
+    }
+}
+
+/**
+ * El rango de 52 semanas con dos marcas: tu precio promedio (un rombo) y el precio de ahora (un
+ * punto). El tramo entre los dos es verde si vas ganando y rojo si vas perdiendo.
+ */
+@Composable
+private fun CostInRange(cost: Double, price: Double, low: Double, high: Double) {
+    val min = minOf(low, cost, price)
+    val max = maxOf(high, cost, price)
+    fun at(v: Double) = ((v - min) / (max - min)).toFloat().coerceIn(0f, 1f)
+    val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    val gain = changeColor(price - cost)
+    val costColor = MaterialTheme.colorScheme.onSurface
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Tu promedio y el precio de ahora, en el rango del año", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Canvas(Modifier.fillMaxWidth().height(18.dp)) {
+            val y = size.height / 2
+            val r = 3.dp.toPx()
+            drawLine(track, Offset(0f, y), Offset(size.width, y), strokeWidth = 6.dp.toPx(), cap = StrokeCap.Round)
+            val a = size.width * at(cost)
+            val b = size.width * at(price)
+            drawLine(gain, Offset(minOf(a, b), y), Offset(maxOf(a, b), y), strokeWidth = 6.dp.toPx(), cap = StrokeCap.Round)
+            // Rombo: el precio promedio.
+            val d = 6.dp.toPx()
+            drawPath(
+                Path().apply {
+                    moveTo(a, y - d); lineTo(a + d, y); lineTo(a, y + d); lineTo(a - d, y); close()
+                },
+                costColor,
+            )
+            drawCircle(gain, radius = 7.dp.toPx(), center = Offset(b, y))
+            drawCircle(Color.White, radius = r, center = Offset(b, y))
+        }
+        Row {
+            Text("◆ Promedio ${Format.price(cost)}", style = MaterialTheme.typography.labelMedium.tabular(), modifier = Modifier.weight(1f))
+            Text("● Ahora ${Format.price(price)}", style = MaterialTheme.typography.labelMedium.tabular(), color = gain)
+        }
+        Row {
+            Text(Format.price(low), style = MaterialTheme.typography.labelSmall.tabular(), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text(Format.price(high), style = MaterialTheme.typography.labelSmall.tabular(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

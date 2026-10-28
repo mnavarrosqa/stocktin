@@ -47,6 +47,29 @@ object Portfolio {
             .map { (currency, positions) -> PortfolioTotal(currency, positions.reduce(Position::plus), positions.size) }
             .sortedByDescending { it.position.value }
 
+    /**
+     * Qué parte de la cartera (en [currency]) es cada símbolo, de mayor a menor. Con más de
+     * [max] símbolos, los más chicos se juntan en "Otros".
+     */
+    fun allocation(holdings: Collection<Holding>, quotes: Map<String, Quote>, currency: String?, max: Int = 5): List<Pair<String, Double>> {
+        val values = holdings.mapNotNull { h ->
+            val q = quotes[h.symbol]?.takeIf { it.currency == currency } ?: return@mapNotNull null
+            h.symbol to h.shares * q.price
+        }.filter { it.second > 0 }.sortedByDescending { it.second }
+        val total = values.sumOf { it.second }
+        if (total <= 0) return emptyList()
+        val shares = values.map { it.first to it.second / total }
+        if (shares.size <= max) return shares
+        return shares.take(max - 1) + ("Otros" to shares.drop(max - 1).sumOf { it.second })
+    }
+
+    /** Qué parte de su cartera (en su moneda) es [symbol], de 0 a 1. */
+    fun weight(symbol: String, holdings: Collection<Holding>, quotes: Map<String, Quote>): Double? {
+        val currency = quotes[symbol]?.currency
+        val all = allocation(holdings, quotes, currency, max = Int.MAX_VALUE)
+        return all.firstOrNull { it.first == symbol }?.second?.takeIf { all.size > 1 }
+    }
+
     fun toJson(holdings: Collection<Holding>): String = JSONArray().apply {
         holdings.forEach { put(JSONObject().put("symbol", it.symbol).put("shares", it.shares).put("cost", it.cost)) }
     }.toString()
