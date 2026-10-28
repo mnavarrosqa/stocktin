@@ -74,6 +74,12 @@ búsqueda al lado.
   listas aparece cuánto vale todo, cuánto cambió hoy y cuánto ganaste (separado por moneda).
 - **Comparar:** en el gráfico del detalle, "vs S&P 500" (o "vs Merval" para acciones argentinas)
   dibuja el índice en la misma escala y muestra cuánto rindió cada uno en el rango.
+- **Agenda** (en Mercados): decisiones de tasas de la Fed, inflación (CPI), informe de empleo y PBI
+  de EE.UU., y los balances de las acciones de tus listas y tu cartera. El día de cada evento llega
+  un aviso (se apaga en Ajustes → Alertas). Las fechas de EE.UU. están en
+  [`calendar.json`](app/src/main/assets/calendar.json): la app lo baja de GitHub, así que para sumar
+  fechas alcanza con editar ese archivo en `main`, sin sacar una versión nueva. Las de los balances
+  vienen de Yahoo Finance.
 - **Compartir la app:** Ajustes → Acerca de → Compartir Stocktin manda el link de descarga.
 - El detalle trae las últimas **noticias** del símbolo y marca el máximo y el mínimo en el gráfico.
 - Con la app abierta los precios se actualizan cada 30 segundos.

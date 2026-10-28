@@ -2,14 +2,12 @@ package app.stocktin.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -120,17 +118,7 @@ private fun AgendaRow(event: AgendaEvent, now: Long, onOpen: (AgendaEvent) -> Un
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(48.dp),
         )
-        Box(Modifier.widthIn(min = 76.dp)) {
-            Surface(shape = RoundedCornerShape(8.dp), color = if (past) container.copy(alpha = 0.4f) else container, contentColor = content) {
-                Text(
-                    event.kind.label,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                )
-            }
-        }
-        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+        Column(Modifier.weight(1f)) {
             Text(
                 event.title,
                 style = MaterialTheme.typography.bodyLarge,
@@ -139,13 +127,30 @@ private fun AgendaRow(event: AgendaEvent, now: Long, onOpen: (AgendaEvent) -> Un
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            val sub = listOfNotNull(
-                event.detail,
-                "Fecha estimada".takeIf { event.estimated },
-                "Ya salió".takeIf { past },
-            ).joinToString(" · ")
-            if (sub.isNotEmpty()) {
-                Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(6.dp), color = if (past) container.copy(alpha = 0.4f) else container, contentColor = content) {
+                    Text(
+                        event.kind.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+                val sub = listOfNotNull(
+                    event.detail,
+                    "Fecha estimada".takeIf { event.estimated },
+                    "Ya salió".takeIf { past },
+                ).joinToString(" · ")
+                if (sub.isNotEmpty()) {
+                    Text(
+                        sub,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
             }
         }
     }
