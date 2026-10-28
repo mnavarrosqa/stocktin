@@ -19,6 +19,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import app.stocktin.alerts.AgendaNotifier
 import app.stocktin.alerts.AlertNotifier
 import app.stocktin.data.MarketHours
 import app.stocktin.data.Repository
@@ -51,6 +52,8 @@ object Widgets {
         val repository = Repository.get(context)
         val result = repository.refresh((symbolsInUse(context) + extra).distinct())
         if (result.isSuccess) AlertNotifier.notify(context, repository.takeReachedAlerts())
+        repository.refreshCalendar()
+        AgendaNotifier.notifyToday(context)
         updateAll(context)
         return result
     }

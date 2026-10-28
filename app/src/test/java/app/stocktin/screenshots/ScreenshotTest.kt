@@ -57,6 +57,7 @@ class ScreenshotTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
             .putBoolean("auto_check_updates", false)
+            .putBoolean("asked_notifications", true)
             .putString("recent_searches", "MELI\nTSLA")
             .commit()
         // Una cartera chica para que se vean la tarjeta de arriba y "Tu posición".

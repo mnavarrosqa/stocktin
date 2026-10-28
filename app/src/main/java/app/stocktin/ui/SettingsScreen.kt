@@ -106,6 +106,7 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
     val uri = LocalUriHandler.current
     var history by remember { mutableStateOf(false) }
     val alerts by viewModel.alerts.collectAsState()
+    val agendaNotifications by viewModel.agendaNotifications.collectAsState()
     val quotes by viewModel.quotes.collectAsState()
     val context = LocalContext.current
 
@@ -143,7 +144,7 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
                     alerts = alerts,
                     quotes = quotes,
                     manualRefresh = minutes == 0,
-                    canNotify = AlertNotifier.canNotify(context),
+                    canNotify = AlertNotifier.canNotify(context) || !agendaNotifications && alerts.isEmpty(),
                     onOpen = { viewModel.open(Screen.Detail(it)) },
                     onRemove = viewModel::removeAlert,
                     onNotificationSettings = {
@@ -153,6 +154,13 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
                             )
                         }
                     },
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                ToggleRow(
+                    title = "Avisos de la agenda",
+                    summary = "El día de una decisión de la Fed, un dato de EE.UU. (inflación, empleo, PBI) o el balance de tus acciones",
+                    checked = agendaNotifications,
+                    onChange = viewModel::setAgendaNotifications,
                 )
             }
 
@@ -278,8 +286,8 @@ private fun AlertsSection(
     onRemove: (Alert) -> Unit,
     onNotificationSettings: () -> Unit,
 ) {
-    if (!canNotify && alerts.isNotEmpty()) {
-        LinkRow(Icons.Filled.Warning, "Las notificaciones están apagadas", "Activalas para que suenen las alertas", onNotificationSettings)
+    if (!canNotify) {
+        LinkRow(Icons.Filled.Warning, "Las notificaciones están apagadas", "Activalas para que lleguen las alertas y la agenda", onNotificationSettings)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     }
     if (alerts.isEmpty()) {

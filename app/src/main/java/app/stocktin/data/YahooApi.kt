@@ -122,6 +122,15 @@ object YahooApi {
         return fresh
     }
 
+    /**
+     * La agenda económica (`calendar.json`) tal como está en GitHub, para poder sumar fechas sin
+     * sacar una versión nueva de la app.
+     */
+    suspend fun calendar(): String = withContext(Dispatchers.IO) { get(CALENDAR_URL) }
+
+    private const val CALENDAR_URL =
+        "https://raw.githubusercontent.com/mnavarrosqa/stocktin/main/app/src/main/assets/calendar.json"
+
     class HttpException(val code: Int) : IOException("Yahoo respondió $code")
 
     private fun get(url: String): String {

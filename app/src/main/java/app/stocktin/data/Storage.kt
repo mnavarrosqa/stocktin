@@ -70,6 +70,8 @@ object Storage {
         putOpt("exchange", q.exchange)
         putOpt("quoteType", q.quoteType)
         put("time", q.time)
+        putOpt("earningsTime", q.earningsTime)
+        put("earningsEstimate", q.earningsEstimate)
     }
 
     private fun quoteFromJson(o: JSONObject): Quote {
@@ -97,6 +99,8 @@ object Storage {
             exchange = o.string("exchange"),
             quoteType = o.string("quoteType"),
             time = o.optLong("time"),
+            earningsTime = if (o.has("earningsTime")) o.getLong("earningsTime") else null,
+            earningsEstimate = o.optBoolean("earningsEstimate"),
         )
     }
 

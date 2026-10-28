@@ -413,6 +413,7 @@ private fun Stats(quote: Quote) {
         quote.dayLow?.let { "Mínimo del día" to Format.price(it) },
         quote.volume?.takeIf { it > 0 }?.let { "Volumen" to Format.compact(it.toDouble()) },
         quote.marketCap?.takeIf { it > 0 }?.let { "Cap. de mercado" to Format.compact(it) },
+        nextEarnings(quote)?.let { "Próximo balance" to it },
     )
     BoxWithConstraints(Modifier.padding(horizontal = 16.dp)) {
         // En paneles anchos (tablet) entran cuatro datos por fila.
@@ -473,6 +474,15 @@ private fun YearRange(price: Double, low: Double, high: Double) {
             }
         }
     }
+}
+
+/** "jue 30 oct" (o "jue 30 oct (est.)" si Yahoo todavía no la confirmó), si es de hoy en adelante. */
+private fun nextEarnings(quote: Quote): String? {
+    val time = quote.earningsTime ?: return null
+    val day = Instant.ofEpochSecond(time).atZone(ZoneId.systemDefault()).toLocalDate()
+    if (day.isBefore(java.time.LocalDate.now())) return null
+    val text = DateTimeFormatter.ofPattern("EEE d MMM", Locale.forLanguageTag("es-AR")).format(day).replace(".", "")
+    return if (quote.earningsEstimate) "$text (est.)" else text
 }
 
 private fun pointTime(epochSeconds: Long, range: ChartRange): String {

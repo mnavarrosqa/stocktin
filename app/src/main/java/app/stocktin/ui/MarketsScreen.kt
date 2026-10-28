@@ -39,7 +39,10 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,6 +52,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.stocktin.data.Agenda
+import app.stocktin.data.AgendaEvent
 import app.stocktin.data.Format
 import app.stocktin.data.MARKET_SECTIONS
 import app.stocktin.data.MarketHours
@@ -76,12 +81,19 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
     val movers by viewModel.movers.collectAsState()
     val moversKind by viewModel.moversKind.collectAsState()
     val now by viewModel.now.collectAsState()
+    val agenda by viewModel.agenda.collectAsState()
+    var agendaSheet by remember { mutableStateOf(false) }
+    val upcoming = remember(agenda, now / 60_000) { Agenda.upcoming(agenda, now, days = 30) }
+    val openEvent: (AgendaEvent) -> Unit = { event ->
+        agendaSheet = false
+        event.symbol?.let { viewModel.open(Screen.Detail(it)) }
+    }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val grid = rememberLazyGridState()
     val scope = rememberCoroutineScope()
 
     // Dónde empieza cada sección en la grilla, para que los chips salten hasta ahí.
-    val headerItems = 3 // estado, chips y destacados
+    val headerItems = 4 // estado, agenda, chips y destacados
     val sectionStart = buildList {
         var index = headerItems
         MARKET_SECTIONS.forEach { section ->
@@ -107,6 +119,10 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
             ) {
                 item(key = "status", span = { GridItemSpan(maxLineSpan) }) {
                     MarketStatus(now, quotes["^GSPC"])
+                }
+                item(key = "agenda", span = { GridItemSpan(maxLineSpan) }) {
+                    // Lo más cercano; el resto del mes, en "Ver todo".
+                    AgendaCard(upcoming, now, openEvent) { agendaSheet = true }
                 }
                 item(key = "chips", span = { GridItemSpan(maxLineSpan) }) {
                     LazyRow(
@@ -153,6 +169,9 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
                 }
             }
         }
+    }
+    if (agendaSheet) {
+        AgendaSheet(upcoming, now, openEvent) { agendaSheet = false }
     }
 }
 

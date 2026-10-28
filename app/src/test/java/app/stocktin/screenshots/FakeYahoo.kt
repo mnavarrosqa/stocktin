@@ -58,8 +58,12 @@ object FakeYahoo {
         symbols.forEach { symbol ->
             val f = fake(symbol)
             val previous = f.price / (1 + f.percent / 100)
+            // Balances en los próximos días, para que se vean en la agenda.
+            val earningsDays = mapOf("AAPL" to 2, "NVDA" to 9, "TSLA" to 5)[symbol]
             result.put(
                 JSONObject()
+                    .putOpt("earningsTimestamp", earningsDays?.let { now + it * 86_400L })
+                    .put("isEarningsDateEstimate", symbol == "NVDA")
                     .put("symbol", symbol)
                     .put("shortName", f.name)
                     .put("regularMarketPrice", f.price)

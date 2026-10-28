@@ -6,6 +6,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import android.os.Build
+import app.stocktin.alerts.AlertNotifier
+import app.stocktin.data.Settings
 import androidx.activity.viewModels
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -64,10 +69,13 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (savedInstanceState == null) handleIntent(intent)
+        askNotificationsOnce()
         setContent {
             val themeMode by viewModel.themeMode.collectAsState()
             val dynamicColor by viewModel.dynamicColor.collectAsState()
@@ -92,7 +100,16 @@ class MainActivity : ComponentActivity() {
         viewModel.setForeground(false)
     }
 
+    /** Una sola vez: permiso para los avisos de la agenda y las alertas (Android 13 en adelante). */
+    private fun askNotificationsOnce() {
+        val settings = Settings(this)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || settings.askedNotifications) return
+        settings.askedNotifications = true
+        if (!AlertNotifier.canNotify(this)) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     private fun handleIntent(intent: Intent?) {
+        intent?.getStringExtra(EXTRA_TAB)?.let { name -> Tab.entries.firstOrNull { it.name == name } }?.let(viewModel::selectTab)
         intent?.getStringExtra(EXTRA_SYMBOL)?.let(viewModel::openFromWidget)
     }
 
@@ -107,6 +124,8 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_SYMBOL = "symbol"
+        /** Pestaña para abrir (por ejemplo, Mercados desde un aviso de la agenda). */
+        const val EXTRA_TAB = "tab"
     }
 }
 

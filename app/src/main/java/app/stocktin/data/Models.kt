@@ -28,6 +28,10 @@ data class Quote(
     val quoteType: String? = null,
     /** Hora de la última cotización, en segundos desde 1970. */
     val time: Long = 0,
+    /** Próxima presentación de resultados (balance), en segundos desde 1970, si Yahoo la sabe. */
+    val earningsTime: Long? = null,
+    /** La fecha del balance es estimada (la empresa todavía no la confirmó). */
+    val earningsEstimate: Boolean = false,
 ) {
     val isUp: Boolean get() = change >= 0
     val isOpen: Boolean get() = marketState == "REGULAR" || quoteType == "CRYPTOCURRENCY"

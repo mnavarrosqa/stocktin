@@ -63,4 +63,19 @@ class Settings(context: Context) {
     var showChangeValue: Boolean
         get() = prefs.getBoolean("show_change_value", false)
         set(value) = prefs.edit().putBoolean("show_change_value", value).apply()
+
+    /** Avisar el día de cada evento de la agenda (Fed, datos de EE.UU. y balances). */
+    var agendaNotifications: Boolean
+        get() = prefs.getBoolean("agenda_notifications", true)
+        set(value) = prefs.edit().putBoolean("agenda_notifications", value).apply()
+
+    /** Eventos de la agenda de los que ya se avisó (los últimos). */
+    var notifiedAgenda: Set<String>
+        get() = prefs.getString("notified_agenda", null)?.split('\n')?.filter { it.isNotBlank() }?.toSet().orEmpty()
+        set(value) = prefs.edit().putString("notified_agenda", value.toList().takeLast(60).joinToString("\n")).apply()
+
+    /** Ya se pidió una vez el permiso de notificaciones al abrir la app. */
+    var askedNotifications: Boolean
+        get() = prefs.getBoolean("asked_notifications", false)
+        set(value) = prefs.edit().putBoolean("asked_notifications", value).apply()
 }

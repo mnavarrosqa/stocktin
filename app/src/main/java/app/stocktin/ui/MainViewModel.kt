@@ -3,6 +3,7 @@ package app.stocktin.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.stocktin.data.AgendaEvent
 import app.stocktin.data.Alert
 import app.stocktin.data.Chart
 import app.stocktin.data.Format
@@ -27,7 +28,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -78,6 +82,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val quotes = repository.quotes
     val alerts = repository.alerts
     val holdings = repository.holdings
+
+    /** Lo que viene: la Fed, datos de EE.UU. y balances de tus símbolos. */
+    val agenda: StateFlow<List<AgendaEvent>> =
+        combine(repository.economy, repository.quotes, repository.lists, repository.holdings) { _, _, _, _ -> repository.agenda() }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, repository.agenda())
+
+    private val _agendaNotifications = MutableStateFlow(settings.agendaNotifications)
+    val agendaNotifications: StateFlow<Boolean> = _agendaNotifications.asStateFlow()
+
+    fun setAgendaNotifications(enabled: Boolean) {
+        settings.agendaNotifications = enabled
+        _agendaNotifications.value = enabled
+    }
     val refreshing = repository.refreshing
     val lastRefresh = repository.lastRefresh
     val lastError = repository.lastError
@@ -195,6 +212,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         RefreshScheduler.schedule(app)
+        viewModelScope.launch { repository.refreshCalendar() }
         afterUpdate()
         if (settings.autoCheckUpdates && System.currentTimeMillis() - settings.lastUpdateCheck > UPDATE_CHECK_INTERVAL_MS) {
             checkForUpdates(manual = false)

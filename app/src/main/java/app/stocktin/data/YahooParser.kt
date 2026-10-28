@@ -115,6 +115,9 @@ object YahooParser {
             exchange = o.optStringOrNull("fullExchangeName") ?: o.optStringOrNull("exchange"),
             quoteType = o.optStringOrNull("quoteType"),
             time = regularTime,
+            // Con fecha estimada Yahoo da un rango: se toma el principio.
+            earningsTime = (o.optLong("earningsTimestampStart").takeIf { it > 0 } ?: o.optLong("earningsTimestamp").takeIf { it > 0 }),
+            earningsEstimate = o.optBoolean("isEarningsDateEstimate", false),
         )
     }
 

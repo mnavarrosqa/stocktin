@@ -14,12 +14,13 @@ import java.util.UUID
  * Listas y últimas cotizaciones, guardadas en archivos de la app para que los widgets muestren
  * algo aunque no haya conexión. La app y los widgets comparten esta misma instancia.
  */
-class Repository private constructor(context: Context) {
+class Repository private constructor(private val context: Context) {
 
     private val listsFile = File(context.filesDir, "watchlists.json")
     private val quotesFile = File(context.filesDir, "quotes.json")
     private val alertsFile = File(context.filesDir, "alerts.json")
     private val holdingsFile = File(context.filesDir, "holdings.json")
+    private val calendarFile = File(context.filesDir, "calendar.json")
     private val settings = Settings(context)
     private val refreshLock = Mutex()
 
@@ -36,6 +37,10 @@ class Repository private constructor(context: Context) {
     private val _holdings = MutableStateFlow(loadHoldings())
     /** La cartera: lo que tenés de cada símbolo. */
     val holdings: StateFlow<Map<String, Holding>> = _holdings.asStateFlow()
+
+    private val _economy = MutableStateFlow(loadCalendar())
+    /** La agenda económica de EE.UU. (Fed, inflación, empleo, PBI). */
+    val economy: StateFlow<List<AgendaEvent>> = _economy.asStateFlow()
 
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
@@ -59,7 +64,12 @@ class Repository private constructor(context: Context) {
             _refreshing.value = true
             try {
                 val fresh = YahooApi.quotes(symbols)
-                _quotes.update { old -> old + fresh.associateBy { it.symbol } }
+                // Si la cotización vino del gráfico (sin fecha de balance), se conserva la que había.
+                _quotes.update { old ->
+                    old + fresh.associate { q ->
+                        q.symbol to if (q.earningsTime == null) q.copy(earningsTime = old[q.symbol]?.earningsTime, earningsEstimate = old[q.symbol]?.earningsEstimate == true) else q
+                    }
+                }
                 saveQuotes()
                 val now = System.currentTimeMillis()
                 settings.lastRefresh = now
@@ -169,6 +179,31 @@ class Repository private constructor(context: Context) {
         }
         return reached
     }
+
+    /** Los símbolos que te importan para la agenda: los de tus listas y tu cartera. */
+    fun mySymbols(): Set<String> = (allSymbols() + _holdings.value.keys).toSet()
+
+    /** La agenda completa: la económica más los balances de tus símbolos. */
+    fun agenda(): List<AgendaEvent> {
+        val mine = mySymbols()
+        return _economy.value + Agenda.earnings(_quotes.value.values.filter { it.symbol in mine })
+    }
+
+    /** Baja la agenda de GitHub (como mucho cada 12 horas) y la guarda para usarla sin conexión. */
+    suspend fun refreshCalendar(force: Boolean = false) {
+        val age = System.currentTimeMillis() - calendarFile.lastModified()
+        if (!force && calendarFile.exists() && age < 12 * 60 * 60 * 1000L) return
+        val text = runCatching { YahooApi.calendar() }.getOrNull() ?: return
+        val events = runCatching { Agenda.parse(text) }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return
+        writeAtomically(calendarFile, text)
+        _economy.value = events
+    }
+
+    /** La agenda guardada, o la que viene con la app si todavía no se bajó ninguna. */
+    private fun loadCalendar(): List<AgendaEvent> =
+        runCatching { Agenda.parse(calendarFile.readText()) }.getOrNull()?.takeIf { it.isNotEmpty() }
+            ?: runCatching { Agenda.parse(context.assets.open("calendar.json").bufferedReader().use { it.readText() }) }
+                .getOrDefault(emptyList())
 
     /** Guarda lo que tenés de [symbol]; con 0 unidades lo saca de la cartera. */
     fun setHolding(symbol: String, shares: Double, cost: Double) = editHoldings { holdings ->
