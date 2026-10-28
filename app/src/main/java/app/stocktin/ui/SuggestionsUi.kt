@@ -145,7 +145,7 @@ fun SuggestionSheet(list: SuggestedList, quotes: Map<String, Quote>, onAdd: () -
                         Column(Modifier.weight(1f)) {
                             Text(symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text(
-                                quote?.name ?: " ",
+                                quote?.name?.takeIf { it != symbol } ?: " ",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
