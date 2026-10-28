@@ -73,6 +73,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val lists = repository.lists
     val quotes = repository.quotes
     val alerts = repository.alerts
+    val holdings = repository.holdings
     val refreshing = repository.refreshing
     val lastRefresh = repository.lastRefresh
     val lastError = repository.lastError
@@ -456,6 +457,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         repository.removeAlert(alert.id)
         _message.value = Message("Alerta de ${alert.symbol} borrada", "Deshacer") {
             repository.restoreAlert(alert)
+        }
+    }
+
+    fun setHolding(symbol: String, shares: Double, cost: Double) {
+        repository.setHolding(symbol, shares, cost)
+        widgetsChanged()
+    }
+
+    fun removeHolding(symbol: String) {
+        val old = repository.holdings.value[symbol] ?: return
+        repository.removeHolding(symbol)
+        _message.value = Message("$symbol salió de tu cartera", "Deshacer") {
+            repository.setHolding(old.symbol, old.shares, old.cost)
         }
     }
 

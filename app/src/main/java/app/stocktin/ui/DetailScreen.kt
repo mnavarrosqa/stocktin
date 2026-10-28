@@ -88,6 +88,9 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
     var alertSheet by remember(symbol) { mutableStateOf(false) }
     val allAlerts by viewModel.alerts.collectAsState()
     val alerts = allAlerts.filter { it.symbol == symbol }
+    val holdings by viewModel.holdings.collectAsState()
+    val holding = holdings[symbol]
+    var holdingSheet by remember(symbol) { mutableStateOf(false) }
     val inAnyList = lists.any { symbol in it.symbols }
     val snackbar = rememberMessages(viewModel)
     val fold = rememberFoldingFeature()
@@ -138,6 +141,16 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        if (holdingSheet && quote != null) {
+            HoldingSheet(
+                symbol = symbol,
+                price = quote.price,
+                holding = holding,
+                onSave = { shares, cost -> viewModel.setHolding(symbol, shares, cost) },
+                onRemove = { viewModel.removeHolding(symbol) },
+                onDismiss = { holdingSheet = false },
+            )
+        }
         if (alertSheet && quote != null) {
             NewAlertSheet(symbol, quote.price, onCreate = { viewModel.addAlert(symbol, it) }, onDismiss = { alertSheet = false })
         }
@@ -177,6 +190,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                         .verticalScroll(rememberScrollState()),
                 ) {
                     Stats(quote)
+                    PositionBlock(holding, quote, onEdit = { holdingSheet = true })
                     AlertsBlock(alerts, quote.price, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                     News(viewModel, symbol)
                 }
@@ -190,6 +204,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
             ) {
                 top(if (inPane) 320.dp else 260.dp)
                 Stats(quote)
+                PositionBlock(holding, quote, onEdit = { holdingSheet = true })
                 AlertsBlock(alerts, quote.price, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                 News(viewModel, symbol)
                 Spacer(Modifier.height(24.dp))

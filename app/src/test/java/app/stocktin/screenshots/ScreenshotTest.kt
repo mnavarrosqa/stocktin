@@ -14,6 +14,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Configuration
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
+import app.stocktin.data.Repository
 import app.stocktin.data.YahooApi
 import app.stocktin.ui.MainActivity
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
@@ -56,6 +57,9 @@ class ScreenshotTest {
             .putBoolean("auto_check_updates", false)
             .putString("recent_searches", "MELI\nTSLA")
             .commit()
+        // Una cartera chica para que se vean la tarjeta de arriba y "Tu posición".
+        Repository.get(context).setHolding("NVDA", 12.0, 160.0)
+        Repository.get(context).setHolding("AAPL", 5.0, 245.0)
         WorkManagerTestInitHelper.initializeTestWorkManager(
             context,
             Configuration.Builder().setExecutor(SynchronousExecutor()).build(),

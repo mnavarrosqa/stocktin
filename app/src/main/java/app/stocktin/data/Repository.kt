@@ -19,6 +19,7 @@ class Repository private constructor(context: Context) {
     private val listsFile = File(context.filesDir, "watchlists.json")
     private val quotesFile = File(context.filesDir, "quotes.json")
     private val alertsFile = File(context.filesDir, "alerts.json")
+    private val holdingsFile = File(context.filesDir, "holdings.json")
     private val settings = Settings(context)
     private val refreshLock = Mutex()
 
@@ -31,6 +32,10 @@ class Repository private constructor(context: Context) {
     private val _alerts = MutableStateFlow(loadAlerts())
     /** Alertas de precio que todavía no se cumplieron. */
     val alerts: StateFlow<List<Alert>> = _alerts.asStateFlow()
+
+    private val _holdings = MutableStateFlow(loadHoldings())
+    /** La cartera: lo que tenés de cada símbolo. */
+    val holdings: StateFlow<Map<String, Holding>> = _holdings.asStateFlow()
 
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
@@ -144,6 +149,23 @@ class Repository private constructor(context: Context) {
         }
         return reached
     }
+
+    /** Guarda lo que tenés de [symbol]; con 0 unidades lo saca de la cartera. */
+    fun setHolding(symbol: String, shares: Double, cost: Double) = editHoldings { holdings ->
+        if (shares <= 0) holdings - symbol else holdings + (symbol to Holding(symbol, shares, cost))
+    }
+
+    fun removeHolding(symbol: String) = editHoldings { it - symbol }
+
+    @Synchronized
+    private fun editHoldings(change: (Map<String, Holding>) -> Map<String, Holding>) {
+        val updated = change(_holdings.value)
+        _holdings.value = updated
+        writeAtomically(holdingsFile, Portfolio.toJson(updated.values))
+    }
+
+    private fun loadHoldings(): Map<String, Holding> =
+        runCatching { Portfolio.fromJson(holdingsFile.readText()) }.getOrDefault(emptyList()).associateBy { it.symbol }
 
     @Synchronized
     private fun editAlerts(change: (List<Alert>) -> List<Alert>) {

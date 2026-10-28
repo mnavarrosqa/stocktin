@@ -34,7 +34,7 @@ object Widgets {
         }
     }
 
-    /** Los símbolos de todas las listas, de los widgets de un símbolo y de las alertas. */
+    /** Los símbolos de todas las listas, de los widgets de un símbolo, de las alertas y de la cartera. */
     suspend fun symbolsInUse(context: Context): List<String> {
         // Si no se pueden leer los widgets, igual se actualizan las listas.
         val tickers = runCatching {
@@ -43,7 +43,7 @@ object Widgets {
             }
         }.getOrDefault(emptyList())
         val repository = Repository.get(context)
-        return (repository.allSymbols() + tickers + repository.alerts.value.map { it.symbol }).distinct()
+        return (repository.allSymbols() + tickers + repository.alerts.value.map { it.symbol } + repository.holdings.value.keys).distinct()
     }
 
     /** Trae cotizaciones nuevas (más [extra], si se pide), avisa las alertas cumplidas y redibuja los widgets. */

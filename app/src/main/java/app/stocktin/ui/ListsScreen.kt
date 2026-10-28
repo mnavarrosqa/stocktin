@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.data.Format
+import app.stocktin.data.Portfolio
 import app.stocktin.widget.WatchlistWidget
 
 /**
@@ -87,6 +88,8 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
     val error by viewModel.lastError.collectAsState()
     val showValue by viewModel.showValue.collectAsState()
     val sortMode by viewModel.sortMode.collectAsState()
+    val holdings by viewModel.holdings.collectAsState()
+    var portfolioSheet by remember { mutableStateOf(false) }
     val list = lists.firstOrNull { it.id == currentId } ?: lists.first()
     var editing by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
@@ -195,6 +198,11 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                 item(key = "strip") {
                     MarketStrip(quotes) { viewModel.open(Screen.Detail(it)) }
                 }
+                if (holdings.isNotEmpty()) {
+                    item(key = "portfolio") {
+                        PortfolioCard(Portfolio.totals(holdings.values, quotes)) { portfolioSheet = true }
+                    }
+                }
                 item(key = "chips") {
                     Row(
                         Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
@@ -294,6 +302,18 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
             },
         )
     }
+    if (portfolioSheet) {
+        PortfolioSheet(
+            holdings = holdings.values,
+            quotes = quotes,
+            onOpen = {
+                portfolioSheet = false
+                viewModel.open(Screen.Detail(it))
+            },
+            onDismiss = { portfolioSheet = false },
+        )
+    }
+
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
