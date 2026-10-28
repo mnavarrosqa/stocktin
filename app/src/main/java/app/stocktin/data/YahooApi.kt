@@ -64,6 +64,11 @@ object YahooApi {
         chart(symbol, range.range, range.interval, prePost = false)
     }
 
+    /** El gráfico del día con pre-apertura y post-cierre. */
+    suspend fun chartExtended(symbol: String): Chart = withContext(Dispatchers.IO) {
+        chart(symbol, ChartRange.DAY.range, ChartRange.DAY.interval, prePost = true)
+    }
+
     suspend fun search(query: String): List<SearchResult> = withContext(Dispatchers.IO) {
         val q = URLEncoder.encode(query.trim(), "UTF-8")
         YahooParser.parseSearch(get("$HOST/v1/finance/search?q=$q&quotesCount=12&newsCount=0&listsCount=0"))

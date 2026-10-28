@@ -23,7 +23,11 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import app.stocktin.data.ChartRange
 import app.stocktin.data.ChartScale
+import app.stocktin.data.ExtSegment
 import app.stocktin.data.Format
+
+/** Qué parte del ancho ocupa cada tramo fuera de horario. */
+private const val EXT_SHARE = 0.14f
 
 /** Minigráfico de una fila de la lista. */
 @Composable
@@ -53,6 +57,9 @@ fun PriceChart(
     compare: List<Double>? = null,
     timestamps: List<Long> = emptyList(),
     range: ChartRange = ChartRange.DAY,
+    /** En 1D, la pre-apertura (a la izquierda) y el post-cierre (a la derecha), en una línea aparte. */
+    before: ExtSegment? = null,
+    after: ExtSegment? = null,
 ) {
     val dash = MaterialColors.outline()
     val grid = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
@@ -66,8 +73,9 @@ fun PriceChart(
     // Los dos colores solo si la línea cruza la base; si no, el color de siempre.
     val up = if (base != null && prices.any { it > base }) Up else color
     val down = if (base != null && prices.any { it < base }) Down else color
-    var low = minOf(prices.minOrNull() ?: 0.0, extra?.minOrNull() ?: Double.MAX_VALUE, base ?: Double.MAX_VALUE)
-    var high = maxOf(prices.maxOrNull() ?: 0.0, extra?.maxOrNull() ?: -Double.MAX_VALUE, base ?: -Double.MAX_VALUE)
+    val outside = before?.prices.orEmpty() + after?.prices.orEmpty()
+    var low = minOf(prices.minOrNull() ?: 0.0, extra?.minOrNull() ?: Double.MAX_VALUE, base ?: Double.MAX_VALUE, outside.minOrNull() ?: Double.MAX_VALUE)
+    var high = maxOf(prices.maxOrNull() ?: 0.0, extra?.maxOrNull() ?: -Double.MAX_VALUE, base ?: -Double.MAX_VALUE, outside.maxOrNull() ?: -Double.MAX_VALUE)
     if (high - low < 1e-9) {
         high += 1
         low -= 1
@@ -78,12 +86,22 @@ fun PriceChart(
     val timeLabels = remember(times, labelStyle) { times.map { (i, text) -> i to measurer.measure(text, axisStyle) } }
     // A la derecha, lugar para los precios de la grilla.
     val gutter = (tickLabels.maxOfOrNull { it.size.width } ?: 0)
+    // Pre y post ocupan una franja a cada lado; la rueda, el resto.
+    val beforeShare = if (before != null) EXT_SHARE else 0f
+    val afterShare = if (after != null) EXT_SHARE else 0f
+    val extLabels = remember(before?.label, after?.label, labelStyle) {
+        listOfNotNull(before?.label, after?.label).associateWith { measurer.measure(it, axisStyle) }
+    }
+    val extColor = guide.copy(alpha = 0.75f)
+    val band = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f)
 
     Canvas(
-        modifier.pointerInput(prices, gutter) {
+        modifier.pointerInput(prices, gutter, beforeShare, afterShare) {
             if (prices.size < 2) return@pointerInput
             val plotWidth = size.width - gutter - 8.dp.toPx()
-            fun index(x: Float) = ((x / plotWidth) * (prices.size - 1)).toInt().coerceIn(0, prices.lastIndex)
+            val start = plotWidth * beforeShare
+            val width = plotWidth * (1 - beforeShare - afterShare)
+            fun index(x: Float) = (((x - start) / width) * (prices.size - 1)).toInt().coerceIn(0, prices.lastIndex)
             awaitEachGesture {
                 val down = awaitFirstDown()
                 down.consume()
@@ -101,17 +119,19 @@ fun PriceChart(
     ) {
         if (prices.size < 2) return@Canvas
         val stroke = 2.dp.toPx()
-        val right = size.width - gutter - 8.dp.toPx()
+        val plotRight = size.width - gutter - 8.dp.toPx()
+        val left = plotRight * beforeShare
+        val right = plotRight * (1 - afterShare)
         val bottomAxis = if (timeLabels.isEmpty()) 0f else (timeLabels.first().second.size.height + 6.dp.toPx())
         val top = 18.dp.toPx()
         val bottom = size.height - bottomAxis - 16.dp.toPx()
-        fun x(i: Int) = right * i / (prices.size - 1)
+        fun x(i: Int) = left + (right - left) * i / (prices.size - 1)
         fun y(v: Double) = (top + (bottom - top) * (1 - (v - low) / (high - low))).toFloat()
 
         // Grilla: líneas finas punteadas con el precio a la derecha.
         ticks.forEachIndexed { i, tick ->
             val ty = y(tick)
-            drawLine(grid, Offset(0f, ty), Offset(right, ty), strokeWidth = 1.dp.toPx(),
+            drawLine(grid, Offset(0f, ty), Offset(plotRight, ty), strokeWidth = 1.dp.toPx(),
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(2.dp.toPx(), 4.dp.toPx())))
             val label = tickLabels[i]
             drawText(label, topLeft = Offset(size.width - label.size.width, ty - label.size.height / 2f))
@@ -120,9 +140,40 @@ fun PriceChart(
         timeLabels.forEach { (i, label) ->
             val tx = x(i)
             drawLine(grid, Offset(tx, bottom + 8.dp.toPx()), Offset(tx, bottom + 12.dp.toPx()), strokeWidth = 1.dp.toPx())
-            val lx = (tx - label.size.width / 2f).coerceIn(0f, right - label.size.width)
+            val lx = (tx - label.size.width / 2f).coerceIn(left, maxOf(left, right - label.size.width))
             drawText(label, topLeft = Offset(lx, size.height - label.size.height))
         }
+
+        // Fuera de horario: una franja apenas sombreada, su nombre arriba y una línea gris punteada que
+        // empalma con la rueda.
+        fun extended(segment: ExtSegment, from: Float, to: Float, joinAt: Int, leading: Boolean) {
+            drawRect(band, topLeft = Offset(from, 0f), size = androidx.compose.ui.geometry.Size(to - from, bottom))
+            extLabels[segment.label]?.let { label ->
+                drawText(label, topLeft = Offset((from + to) / 2f - label.size.width / 2f, 0f))
+            }
+            val points = segment.prices
+            val path = Path()
+            val n = points.size
+            fun px(k: Int) = if (n == 1) (from + to) / 2f else from + (to - from) * k / (n - 1)
+            if (leading) {
+                path.moveTo(px(0), y(points[0]))
+                for (k in 1 until n) path.lineTo(px(k), y(points[k]))
+                path.lineTo(x(joinAt), y(prices[joinAt]))
+            } else {
+                path.moveTo(x(joinAt), y(prices[joinAt]))
+                for (k in 0 until n) path.lineTo(px(k), y(points[k]))
+            }
+            drawPath(
+                path, extColor,
+                style = Stroke(
+                    width = stroke * 0.8f, cap = StrokeCap.Round, join = StrokeJoin.Round,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
+                ),
+            )
+            if (!leading) drawCircle(extColor, radius = 3.dp.toPx(), center = Offset(px(n - 1), y(points.last())))
+        }
+        before?.let { extended(it, 0f, left - 4.dp.toPx(), joinAt = 0, leading = true) }
+        after?.let { extended(it, right + 4.dp.toPx(), plotRight, joinAt = prices.lastIndex, leading = false) }
 
         val line = Path().apply {
             moveTo(x(0), y(prices[0]))
@@ -133,19 +184,19 @@ fun PriceChart(
         val area = Path().apply {
             addPath(line)
             lineTo(x(prices.lastIndex), by)
-            lineTo(0f, by)
+            lineTo(x(0), by)
             close()
         }
-        clipRect(left = 0f, top = 0f, right = right, bottom = by) {
+        clipRect(left = left, top = 0f, right = right + stroke, bottom = by) {
             drawPath(area, Brush.verticalGradient(listOf(up.copy(alpha = 0.30f), up.copy(alpha = 0.03f)), startY = top, endY = by))
             drawPath(line, up, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
-        clipRect(left = 0f, top = by, right = right, bottom = size.height) {
+        clipRect(left = left, top = by, right = right + stroke, bottom = size.height) {
             drawPath(area, Brush.verticalGradient(listOf(down.copy(alpha = 0.03f), down.copy(alpha = 0.30f)), startY = by, endY = bottom))
             drawPath(line, down, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
         if (base != null) {
-            drawLine(dash, Offset(0f, by), Offset(right, by), strokeWidth = 1.dp.toPx(),
+            drawLine(dash, Offset(0f, by), Offset(plotRight, by), strokeWidth = 1.dp.toPx(),
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx())))
         }
         if (extra != null) {
@@ -178,7 +229,7 @@ fun PriceChart(
             listOf(hi to true, lo to false).distinctBy { it.first }.forEach { (index, above) ->
                 val text = measurer.measure(Format.price(prices[index]), labelStyle)
                 val p = Offset(x(index), y(prices[index]))
-                val tx = (p.x - text.size.width / 2f).coerceIn(0f, right - text.size.width)
+                val tx = (p.x - text.size.width / 2f).coerceIn(left, maxOf(left, right - text.size.width))
                 val ty = if (above) p.y - text.size.height - 4.dp.toPx() else p.y + 4.dp.toPx()
                 drawText(text, topLeft = Offset(tx, ty.coerceIn(0f, size.height - text.size.height)))
             }

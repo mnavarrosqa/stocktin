@@ -70,6 +70,8 @@ data class ChartState(
     val error: String? = null,
     /** El índice de referencia en el mismo rango, si se está comparando. */
     val benchmark: Chart? = null,
+    /** En 1D, el mismo día con pre-apertura y post-cierre. */
+    val extended: Chart? = null,
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -447,12 +449,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun loadChart(symbol: String, range: ChartRange) {
         chartJob?.cancel()
         val old = _chart.value?.takeIf { it.symbol == symbol && it.range == range }
-        _chart.value = ChartState(symbol, range, chart = old?.chart, benchmark = old?.benchmark)
+        _chart.value = ChartState(symbol, range, chart = old?.chart, benchmark = old?.benchmark, extended = old?.extended)
         val benchmark = ChartCompare.benchmarkFor(symbol)?.first?.takeIf { _compare.value }
         chartJob = viewModelScope.launch {
             val other = benchmark?.let { async { runCatching { YahooApi.chart(it, range) }.getOrNull() } }
+            val extended = if (range == ChartRange.DAY) async { runCatching { YahooApi.chartExtended(symbol) }.getOrNull() } else null
             _chart.value = runCatching { YahooApi.chart(symbol, range) }.fold(
-                onSuccess = { ChartState(symbol, range, it, loading = false, benchmark = other?.await()) },
+                onSuccess = { ChartState(symbol, range, it, loading = false, benchmark = other?.await(), extended = extended?.await()) },
                 onFailure = { ChartState(symbol, range, null, loading = false, error = "No se pudo cargar el gráfico") },
             )
         }

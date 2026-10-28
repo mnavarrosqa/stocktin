@@ -65,6 +65,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.data.ChartCompare
 import app.stocktin.data.ChartRange
+import app.stocktin.data.ExtSegment
+import app.stocktin.data.ExtendedHours
 import app.stocktin.data.ExtSession
 import app.stocktin.data.Format
 import app.stocktin.data.Quote
@@ -172,6 +174,8 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
         val range = state?.range ?: ChartRange.DAY
         val baseline = if (range == ChartRange.DAY) quote.previousClose ?: chart?.previousClose else prices.firstOrNull()
         val benchmark = ChartCompare.benchmarkFor(symbol)
+        val (before, after) = state?.extended?.takeIf { range == ChartRange.DAY }
+            ?.let { extended -> chart?.let { ExtendedHours.split(it, extended) } } ?: (null to null)
         val start = baseline ?: prices.firstOrNull()
         val overlay = if (comparing && chart != null && start != null) {
             state?.benchmark?.let { other -> ChartCompare.overlay(chart, start, other, if (range == ChartRange.DAY) other.previousClose else null) }
@@ -192,6 +196,8 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 compare = overlay,
                 timestamps = chart?.timestamps.orEmpty(),
                 range = range,
+                before = before,
+                after = after,
             )
             RangeSelector(range) { viewModel.setRange(it) }
             if (benchmark != null && prices.size >= 2 && start != null) {
@@ -315,6 +321,8 @@ private fun ChartBlock(
     compare: List<Double>? = null,
     timestamps: List<Long> = emptyList(),
     range: ChartRange = ChartRange.DAY,
+    before: ExtSegment? = null,
+    after: ExtSegment? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     Box(Modifier.fillMaxWidth().height(height), contentAlignment = Alignment.Center) {
@@ -333,6 +341,8 @@ private fun ChartBlock(
                 compare = compare,
                 timestamps = timestamps,
                 range = range,
+                before = before,
+                after = after,
             )
             loading -> CircularProgressIndicator()
             else -> Text(error ?: "Sin datos para este rango", color = MaterialTheme.colorScheme.onSurfaceVariant)

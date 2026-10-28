@@ -42,6 +42,7 @@ object FakeYahoo {
         "/v8/finance/chart/" in url -> chart(
             URLDecoder.decode(url.substringAfter("/v8/finance/chart/").substringBefore('?'), "UTF-8"),
             param(url, "range"),
+            prePost = param(url, "includePrePost") == "true",
         )
         "/v1/finance/trending" in url -> trending()
         "/v1/finance/screener" in url -> screener(param(url, "scrIds"))
@@ -88,7 +89,7 @@ object FakeYahoo {
     }
 
     /** Un recorrido al azar (siempre el mismo para cada símbolo) que termina en el precio actual. */
-    private fun chart(symbol: String, range: String): String {
+    private fun chart(symbol: String, range: String, prePost: Boolean = false): String {
         val f = fake(symbol)
         val previous = f.price / (1 + f.percent / 100)
         val (count, step) = when (range) {
@@ -118,6 +119,28 @@ object FakeYahoo {
             times.put(start + i * step)
             closes.put(if (i == count - 1) f.price else drift + noise)
         }
+        // Con pre y post (solo acciones): dos horas antes de la rueda y una después.
+        if (prePost && range == "1d" && f.type == "EQUITY") {
+            val pre = JSONArray()
+            val preCloses = JSONArray()
+            for (i in 24 downTo 1) {
+                pre.put(start - i * step)
+                preCloses.put(previous * (1 + 0.004 * kotlin.math.sin(i / 3.0)) + (24 - i) * previous * 0.0002)
+            }
+            for (i in 0 until times.length()) {
+                pre.put(times.get(i))
+                preCloses.put(closes.get(i))
+            }
+            for (i in 1..12) {
+                pre.put(regularEnd + i * step)
+                preCloses.put(f.price * (1 + 0.003 * kotlin.math.sin(i / 2.0) - i * 0.0004))
+            }
+            return chartJson(symbol, f, range, previous, first, pre, preCloses)
+        }
+        return chartJson(symbol, f, range, previous, first, times, closes)
+    }
+
+    private fun chartJson(symbol: String, f: Fake, range: String, previous: Double, first: Double, times: JSONArray, closes: JSONArray): String {
         val meta = JSONObject()
             .put("symbol", symbol)
             .put("shortName", f.name)
