@@ -78,4 +78,9 @@ class Settings(context: Context) {
     var askedNotifications: Boolean
         get() = prefs.getBoolean("asked_notifications", false)
         set(value) = prefs.edit().putBoolean("asked_notifications", value).apply()
+
+    /** Ocultar el saldo de la cartera (el ojito, como en las apps de los bancos). */
+    var hideBalance: Boolean
+        get() = prefs.getBoolean("hide_balance", false)
+        set(value) = prefs.edit().putBoolean("hide_balance", value).apply()
 }

@@ -520,6 +520,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private val _hideBalance = MutableStateFlow(settings.hideBalance)
+    /** El saldo de la cartera está oculto. */
+    val hideBalance: StateFlow<Boolean> = _hideBalance.asStateFlow()
+
+    fun toggleHideBalance() {
+        settings.hideBalance = !_hideBalance.value
+        _hideBalance.value = settings.hideBalance
+    }
+
     fun setHolding(symbol: String, shares: Double, cost: Double) {
         repository.setHolding(symbol, shares, cost)
         widgetsChanged()

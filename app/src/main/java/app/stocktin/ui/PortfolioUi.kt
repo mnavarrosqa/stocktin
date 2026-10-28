@@ -21,6 +21,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -30,12 +32,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -53,11 +57,38 @@ import java.util.Locale
 /** "USD 1,234.56" (sin moneda si Yahoo no la dice). */
 fun money(value: Double, currency: String?): String = listOfNotNull(currency, Format.price(value)).joinToString(" ")
 
-/** "+123.45 (+1.20%)" en verde o rojo. */
+/** Saldo oculto (el ojito de la cartera): los montos y las cantidades se tapan, los porcentajes no. */
+val LocalHideBalance = compositionLocalOf { false }
+
+private const val HIDDEN = "••••••"
+
+/** [money], o la moneda con puntitos si el saldo está oculto. */
+@Composable
+private fun shownMoney(value: Double, currency: String?): String =
+    if (LocalHideBalance.current) listOfNotNull(currency, HIDDEN).joinToString(" ") else money(value, currency)
+
+/** [shares], o puntitos si el saldo está oculto. */
+@Composable
+private fun shownShares(value: Double): String = if (LocalHideBalance.current) "••" else shares(value)
+
+/** El ojito para mostrar u ocultar el saldo. */
+@Composable
+fun HideBalanceButton(onToggle: () -> Unit, tint: Color = LocalContentColor.current) {
+    val hidden = LocalHideBalance.current
+    IconButton(onClick = onToggle) {
+        Icon(
+            painterResource(if (hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility),
+            if (hidden) "Mostrar saldo" else "Ocultar saldo",
+            tint = tint,
+        )
+    }
+}
+
+/** "+123.45 (+1.20%)" en verde o rojo (solo "+1.20%" si el saldo está oculto). */
 @Composable
 private fun GainText(value: Double, percent: Double, style: androidx.compose.ui.text.TextStyle) {
     Text(
-        "${Format.change(value)} (${Format.percent(percent)})",
+        if (LocalHideBalance.current) Format.percent(percent) else "${Format.change(value)} (${Format.percent(percent)})",
         style = style.tabular(),
         color = changeColor(value),
         fontWeight = FontWeight.SemiBold,
@@ -66,7 +97,7 @@ private fun GainText(value: Double, percent: Double, style: androidx.compose.ui.
 
 /** Arriba de las listas: cuánto vale la cartera, cuánto cambió hoy y cuánto ganaste en total. */
 @Composable
-fun PortfolioCard(totals: List<PortfolioTotal>, onClick: () -> Unit) {
+fun PortfolioCard(totals: List<PortfolioTotal>, onToggleHidden: () -> Unit, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(24.dp),
@@ -74,11 +105,12 @@ fun PortfolioCard(totals: List<PortfolioTotal>, onClick: () -> Unit) {
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
     ) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+        Column(Modifier.padding(start = 20.dp, end = 16.dp, top = 6.dp, bottom = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(painterResource(R.drawable.ic_wallet), null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Tu cartera", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                HideBalanceButton(onToggleHidden)
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
             }
             if (totals.isEmpty()) {
@@ -87,7 +119,7 @@ fun PortfolioCard(totals: List<PortfolioTotal>, onClick: () -> Unit) {
             totals.forEach { total ->
                 val p = total.position
                 Spacer(Modifier.height(6.dp))
-                Text(money(p.value, total.currency), style = MaterialTheme.typography.headlineMedium.tabular(), fontWeight = FontWeight.Bold)
+                Text(shownMoney(p.value, total.currency), style = MaterialTheme.typography.headlineMedium.tabular(), fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Column {
                         Text("Hoy", style = MaterialTheme.typography.labelMedium)
@@ -119,7 +151,7 @@ fun PortfolioSheet(holdings: Collection<Holding>, quotes: Map<String, Quote>, on
             totals.forEach { total ->
                 val p = total.position
                 Row(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalAlignment = Alignment.Bottom) {
-                    Text(money(p.value, total.currency), style = MaterialTheme.typography.titleMedium.tabular(), modifier = Modifier.weight(1f))
+                    Text(shownMoney(p.value, total.currency), style = MaterialTheme.typography.titleMedium.tabular(), modifier = Modifier.weight(1f))
                     GainText(p.gain, p.gainPercent, MaterialTheme.typography.bodyMedium)
                 }
             }
@@ -137,13 +169,13 @@ fun PortfolioSheet(holdings: Collection<Holding>, quotes: Map<String, Quote>, on
                     Column(Modifier.weight(1f)) {
                         Text(h.symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(
-                            "${shares(h.shares)} × ${Format.price(h.cost)}",
+                            "${shownShares(h.shares)} × ${Format.price(h.cost)}",
                             style = MaterialTheme.typography.bodySmall.tabular(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(p?.let { money(it.value, q?.currency) } ?: "—", style = MaterialTheme.typography.titleSmall.tabular())
+                        Text(p?.let { shownMoney(it.value, q?.currency) } ?: "—", style = MaterialTheme.typography.titleSmall.tabular())
                         if (p != null) GainText(p.gain, p.gainPercent, MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -160,7 +192,7 @@ fun PortfolioSheet(holdings: Collection<Holding>, quotes: Map<String, Quote>, on
 
 /** En el detalle: lo que tenés de este símbolo, o el botón para cargarlo. */
 @Composable
-fun PositionBlock(holding: Holding?, quote: Quote, onEdit: () -> Unit) {
+fun PositionBlock(holding: Holding?, quote: Quote, onEdit: () -> Unit, onToggleHidden: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -173,25 +205,26 @@ fun PositionBlock(holding: Holding?, quote: Quote, onEdit: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text("Tu posición", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        if (holding == null) "Cargá cuántas tenés y ves cuánto ganás" else "${shares(holding.shares)} a ${Format.price(holding.cost)} de promedio",
+                        if (holding == null) "Cargá cuántas tenés y ves cuánto ganás" else "${shownShares(holding.shares)} a ${Format.price(holding.cost)} de promedio",
                         style = MaterialTheme.typography.bodySmall.tabular(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                if (holding != null) HideBalanceButton(onToggleHidden, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (holding == null) OutlinedButton(onClick = onEdit) { Text("Cargar") } else TextButton(onClick = onEdit) { Text("Editar") }
             }
             if (holding != null) {
                 val p = Portfolio.position(holding, quote)
                 Row(Modifier.padding(top = 10.dp, end = 8.dp)) {
                     PositionStat("Valor", Modifier.weight(1f)) {
-                        Text(money(p.value, quote.currency), style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.SemiBold)
+                        Text(shownMoney(p.value, quote.currency), style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.SemiBold)
                     }
                     PositionStat("Hoy", Modifier.weight(1f)) { GainText(p.dayChange, p.dayPercent, MaterialTheme.typography.bodyMedium) }
                 }
                 Row(Modifier.padding(top = 8.dp, end = 8.dp)) {
                     PositionStat("Ganancia total", Modifier.weight(1f)) { GainText(p.gain, p.gainPercent, MaterialTheme.typography.bodyMedium) }
                     PositionStat("Costo", Modifier.weight(1f)) {
-                        Text(money(p.costBasis, quote.currency), style = MaterialTheme.typography.bodyMedium.tabular())
+                        Text(shownMoney(p.costBasis, quote.currency), style = MaterialTheme.typography.bodyMedium.tabular())
                     }
                 }
             }

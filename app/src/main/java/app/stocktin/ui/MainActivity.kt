@@ -16,6 +16,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.animation.AnimatedContent
@@ -79,8 +80,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by viewModel.themeMode.collectAsState()
             val dynamicColor by viewModel.dynamicColor.collectAsState()
+            val hideBalance by viewModel.hideBalance.collectAsState()
             StocktinTheme(themeMode = themeMode, dynamicColor = dynamicColor) {
-                App(viewModel, onUpdate = ::update)
+                CompositionLocalProvider(LocalHideBalance provides hideBalance) {
+                    App(viewModel, onUpdate = ::update)
+                }
             }
         }
     }

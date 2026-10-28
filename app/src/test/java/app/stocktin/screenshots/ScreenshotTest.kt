@@ -93,6 +93,17 @@ class ScreenshotTest {
     }
 
     @Test
+    fun listsHiddenBalance() {
+        launch()
+        compose.onNodeWithContentDescription("Ocultar saldo").performClick()
+        settle()
+        shot("01b_listas_saldo_oculto")
+        // Se deja como estaba para las demás capturas.
+        compose.onNodeWithContentDescription("Mostrar saldo").performClick()
+        settle()
+    }
+
+    @Test
     @Config(qualifiers = "$PHONE_SIZE-night-xxhdpi")
     fun listsDark() {
         launch()

@@ -226,7 +226,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                         .verticalScroll(rememberScrollState()),
                 ) {
                     Stats(quote)
-                    PositionBlock(holding, quote, onEdit = { holdingSheet = true })
+                    PositionBlock(holding, quote, onEdit = { holdingSheet = true }, onToggleHidden = viewModel::toggleHideBalance)
                     AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                     News(viewModel, symbol)
                 }
@@ -240,7 +240,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
             ) {
                 top(if (inPane) 320.dp else 260.dp)
                 Stats(quote)
-                PositionBlock(holding, quote, onEdit = { holdingSheet = true })
+                PositionBlock(holding, quote, onEdit = { holdingSheet = true }, onToggleHidden = viewModel::toggleHideBalance)
                 AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                 News(viewModel, symbol)
                 Spacer(Modifier.height(24.dp))
