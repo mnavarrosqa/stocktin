@@ -299,16 +299,32 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
         }
     }
 
-    nameDialog?.let { dialog ->
+    if (nameDialog == NameDialog.Create) {
+        NewListSheet(
+            suggestions = Suggestions.available(lists),
+            onCreateEmpty = { name ->
+                nameDialog = null
+                viewModel.createList(name)
+            },
+            onAdd = {
+                nameDialog = null
+                viewModel.addSuggested(it)
+            },
+            onPreview = {
+                nameDialog = null
+                openedSuggestion = it
+                viewModel.previewSuggested(it)
+            },
+            onDismiss = { nameDialog = null },
+        )
+    }
+    (nameDialog as? NameDialog.Rename)?.let { dialog ->
         NameInputDialog(
-            title = if (dialog is NameDialog.Rename) "Renombrar lista" else "Nueva lista",
-            initial = (dialog as? NameDialog.Rename)?.name.orEmpty(),
+            title = "Renombrar lista",
+            initial = dialog.name,
             onDismiss = { nameDialog = null },
             onConfirm = { name ->
-                when (dialog) {
-                    NameDialog.Create -> viewModel.createList(name)
-                    is NameDialog.Rename -> viewModel.renameList(dialog.id, name)
-                }
+                viewModel.renameList(dialog.id, name)
                 nameDialog = null
             },
         )

@@ -118,6 +118,15 @@ class ScreenshotTest {
         captureScreenRoboImage("screenshots/01d_lista_sugerida.png")
     }
 
+    @OptIn(ExperimentalRoborazziApi::class)
+    @Test
+    fun newList() {
+        launch()
+        compose.onNodeWithText("Nueva").performClick()
+        settle()
+        captureScreenRoboImage("screenshots/01e_nueva_lista.png")
+    }
+
     @Test
     fun listsHiddenBalance() {
         launch()

@@ -1,5 +1,6 @@
 package app.stocktin.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,21 +15,32 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.stocktin.data.Format
@@ -82,7 +94,7 @@ private fun SuggestionCard(list: SuggestedList, quotes: Map<String, Quote>, onCl
             )
             Spacer(Modifier.weight(1f))
             Text(
-                list.symbols.take(4).joinToString(" · ") { it.removeSuffix(".BA").removeSuffix("-USD").removeSuffix("=F").removeSuffix("=X") } +
+                list.symbols.take(4).joinToString(" · ") { shortSymbol(it) } +
                     if (list.symbols.size > 4) " +${list.symbols.size - 4}" else "",
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,
@@ -170,3 +182,82 @@ fun SuggestionSheet(list: SuggestedList, quotes: Map<String, Quote>, onAdd: () -
         }
     }
 }
+
+/**
+ * Al crear una lista: el nombre para una vacía y, abajo, las listas sugeridas para empezar con una
+ * ya armada (tocar una muestra qué trae; "Agregar" la arma directo).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NewListSheet(
+    suggestions: List<SuggestedList>,
+    onCreateEmpty: (String) -> Unit,
+    onAdd: (SuggestedList) -> Unit,
+    onPreview: (SuggestedList) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 16.dp)) {
+            Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Nueva lista", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nombre") },
+                    placeholder = { Text("Por ejemplo, Largo plazo") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onCreateEmpty(name) }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Button(
+                    onClick = { onCreateEmpty(name) },
+                    enabled = name.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                ) { Text("Crear lista vacía") }
+            }
+            if (suggestions.isNotEmpty()) {
+                Text(
+                    "O empezá con una armada",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 4.dp),
+                )
+                suggestions.forEach { list ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onPreview(list) }
+                            .padding(start = 24.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(list.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(
+                                list.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                list.symbols.joinToString(" · ") { shortSymbol(it) },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
+                        FilledTonalButton(onClick = { onAdd(list) }, modifier = Modifier.padding(start = 8.dp)) { Text("Agregar") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** NVDA, GGAL (sin .BA), BTC (sin -USD), GC (sin =F). */
+private fun shortSymbol(symbol: String) =
+    symbol.removeSuffix(".BA").removeSuffix("-USD").removeSuffix("=F").removeSuffix("=X")
