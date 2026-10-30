@@ -50,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,12 +64,15 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.stocktin.data.Cedears
 import app.stocktin.data.ChartCompare
 import app.stocktin.data.ChartRange
 import app.stocktin.data.ExtSegment
 import app.stocktin.data.ExtendedHours
 import app.stocktin.data.ExtSession
 import app.stocktin.data.Format
+import app.stocktin.data.Holding
+import app.stocktin.data.LocalListing
 import app.stocktin.data.NewsItem
 import app.stocktin.data.Portfolio
 import app.stocktin.data.Quote
@@ -97,7 +101,9 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
     val alerts = allAlerts.filter { it.symbol == symbol }
     val holdings by viewModel.holdings.collectAsState()
     val holding = holdings[symbol]
-    var holdingSheet by remember(symbol) { mutableStateOf(false) }
+    // Qué se está cargando en la hoja de la posición: 0 = acciones, 1 = CEDEARs (null = cerrada).
+    var holdingSheet by remember(symbol) { mutableStateOf<Int?>(null) }
+    val local = Cedears.localFor(symbol, quote)
     val inAnyList = lists.any { symbol in it.symbols }
     val snackbar = rememberMessages(viewModel)
     val fold = rememberFoldingFeature()
@@ -148,14 +154,20 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        if (holdingSheet && quote != null) {
+        val sheet = holdingSheet
+        if (sheet != null && quote != null) {
+            val targets = listOfNotNull(
+                HoldingTarget(symbol, "Acciones", quote.price, holding, quote.currency),
+                local?.let { HoldingTarget(it.symbol, it.label, quotes[it.symbol]?.price, holdings[it.symbol], "ARS") },
+            )
             HoldingSheet(
-                symbol = symbol,
-                price = quote.price,
-                holding = holding,
-                onSave = { shares, cost -> viewModel.setHolding(symbol, shares, cost) },
-                onRemove = { viewModel.removeHolding(symbol) },
-                onDismiss = { holdingSheet = false },
+                title = symbol,
+                targets = targets,
+                initial = sheet,
+                onSelect = { viewModel.ensureQuotes(listOf(it.symbol)) },
+                onSave = { target, shares, cost -> viewModel.setHolding(target, shares, cost) },
+                onRemove = { viewModel.removeHolding(it) },
+                onDismiss = { holdingSheet = null },
             )
         }
         if (alertSheet && quote != null) {
@@ -227,7 +239,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                         .verticalScroll(rememberScrollState()),
                 ) {
                     Stats(quote)
-                    PositionBlock(holding, quote, Portfolio.weight(symbol, holdings.values, quotes), onEdit = { holdingSheet = true }, onToggleHidden = viewModel::toggleHideBalance)
+                    PositionCards(viewModel, symbol, quote, local, holdings, quotes) { holdingSheet = it }
                     AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                     News(viewModel, symbol)
                 }
@@ -241,7 +253,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
             ) {
                 top(if (inPane) 320.dp else 260.dp)
                 Stats(quote)
-                PositionBlock(holding, quote, Portfolio.weight(symbol, holdings.values, quotes), onEdit = { holdingSheet = true }, onToggleHidden = viewModel::toggleHideBalance)
+                PositionCards(viewModel, symbol, quote, local, holdings, quotes) { holdingSheet = it }
                 AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                 News(viewModel, symbol)
                 Spacer(Modifier.height(24.dp))
@@ -464,6 +476,55 @@ private fun Stats(quote: Quote) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
+            )
+        }
+    }
+}
+
+/**
+ * "Tu posición" en el detalle: la de acciones y, si cargaste, la de CEDEARs (o acciones en pesos)
+ * aparte, valuada con su propia cotización en pesos. [onEdit] recibe cuál abrir: 0 acciones, 1 CEDEARs.
+ */
+@Composable
+private fun PositionCards(
+    viewModel: MainViewModel,
+    symbol: String,
+    quote: Quote,
+    local: LocalListing?,
+    holdings: Map<String, Holding>,
+    quotes: Map<String, Quote>,
+    onEdit: (Int) -> Unit,
+) {
+    val holding = holdings[symbol]
+    val localHolding = local?.let { holdings[it.symbol] }
+    if (holding != null || localHolding == null) {
+        PositionBlock(
+            holding = holding,
+            quote = quote,
+            weight = Portfolio.weight(symbol, holdings.values, quotes),
+            onEdit = { onEdit(0) },
+            onToggleHidden = viewModel::toggleHideBalance,
+            emptyHint = if (local == null) "Cargá cuántas tenés y ves cuánto ganás" else "Acciones o ${local.label.lowercase()}: cargá cuántas tenés y ves cuánto ganás",
+        )
+    }
+    if (local != null && localHolding != null) {
+        val localQuote = quotes[local.symbol]
+        LaunchedEffect(local.symbol, localQuote == null) { if (localQuote == null) viewModel.ensureQuotes(listOf(local.symbol)) }
+        if (localQuote != null) {
+            PositionBlock(
+                holding = localHolding,
+                quote = localQuote,
+                weight = Portfolio.weight(local.symbol, holdings.values, quotes),
+                onEdit = { onEdit(1) },
+                onToggleHidden = viewModel::toggleHideBalance,
+                title = "Tus ${local.label.lowercase()} (${local.symbol})",
+            )
+        } else {
+            Text(
+                "Buscando la cotización de ${local.symbol} para valuar tus ${local.label.lowercase()}…",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )
         }
     }

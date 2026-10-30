@@ -192,6 +192,20 @@ class ScreenshotTest {
 
     @OptIn(ExperimentalRoborazziApi::class)
     @Test
+    fun cedears() {
+        launch()
+        openSymbol("NVDA")
+        settle()
+        compose.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText("Editar"))
+        compose.onNodeWithText("Editar").performClick()
+        settle()
+        compose.onNodeWithText("CEDEARs").performClick()
+        settle()
+        captureScreenRoboImage("screenshots/04d_posicion_cedears.png")
+    }
+
+    @OptIn(ExperimentalRoborazziApi::class)
+    @Test
     fun alert() {
         launch()
         openSymbol("NVDA")

@@ -75,6 +75,8 @@ búsqueda al lado.
   una notificación y se revisan cada vez que se actualizan los precios. En Ajustes están todas.
 - **Cartera:** en el detalle, "Tu posición" → cantidad y precio promedio de compra. Arriba de las
   listas aparece cuánto vale todo, cuánto cambió hoy y cuánto ganaste (separado por moneda). El
+  Para acciones y ETFs de EE.UU. se pueden cargar también **CEDEARs** (o la acción en pesos de un
+  ADR argentino): se valúan con su cotización en Buenos Aires (`AAPL.BA`) y van al total en pesos. El
   ojito oculta los montos y las cantidades (quedan los porcentajes), como en las apps de los bancos.
 - **Comparar:** en el gráfico del detalle, "vs S&P 500" (o "vs Merval" para acciones argentinas)
   dibuja el índice en la misma escala y muestra cuánto rindió cada uno en el rango.

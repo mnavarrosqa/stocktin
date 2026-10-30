@@ -40,6 +40,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -278,7 +281,15 @@ fun PortfolioSheet(holdings: Collection<Holding>, quotes: Map<String, Quote>, on
  * para cargarla.
  */
 @Composable
-fun PositionBlock(holding: Holding?, quote: Quote, weight: Double?, onEdit: () -> Unit, onToggleHidden: () -> Unit) {
+fun PositionBlock(
+    holding: Holding?,
+    quote: Quote,
+    weight: Double?,
+    onEdit: () -> Unit,
+    onToggleHidden: () -> Unit,
+    title: String = "Tu posición",
+    emptyHint: String = "Cargá cuántas tenés y ves cuánto ganás",
+) {
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -289,10 +300,10 @@ fun PositionBlock(holding: Holding?, quote: Quote, weight: Double?, onEdit: () -
                 Icon(painterResource(R.drawable.ic_wallet), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Tu posición", style = MaterialTheme.typography.titleSmall)
+                    Text(title, style = MaterialTheme.typography.titleSmall)
                     if (holding == null) {
                         Text(
-                            "Cargá cuántas tenés y ves cuánto ganás",
+                            emptyHint,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -388,31 +399,71 @@ private fun CostInRange(cost: Double, price: Double, low: Double, high: Double) 
     }
 }
 
-/** Cargar o cambiar cuántas unidades tenés y a qué precio promedio. */
+/** Una forma de tener un símbolo: la acción en EE.UU. o su CEDEAR (o la acción local) en pesos. */
+class HoldingTarget(
+    val symbol: String,
+    val label: String,
+    /** El precio de ahora, si ya llegó. */
+    val price: Double?,
+    val holding: Holding?,
+    val currency: String?,
+)
+
+/**
+ * Cargar o cambiar cuántas unidades tenés y a qué precio promedio. Si hay más de una forma de
+ * tenerlo (acciones o CEDEARs), arriba se elige cuál.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HoldingSheet(
-    symbol: String,
-    price: Double,
-    holding: Holding?,
-    onSave: (shares: Double, cost: Double) -> Unit,
-    onRemove: () -> Unit,
+    title: String,
+    targets: List<HoldingTarget>,
+    initial: Int,
+    onSelect: (HoldingTarget) -> Unit,
+    onSave: (symbol: String, shares: Double, cost: Double) -> Unit,
+    onRemove: (symbol: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var sharesText by remember { mutableStateOf(holding?.shares?.let(::shares).orEmpty()) }
-    var costText by remember { mutableStateOf(plainPrice(holding?.cost ?: price)) }
+    var selected by remember { mutableStateOf(initial.coerceIn(0, targets.lastIndex)) }
+    val target = targets[selected]
+    var sharesText by remember(selected) { mutableStateOf(target.holding?.shares?.let(::shares).orEmpty()) }
+    var costText by remember(selected, target.price != null) {
+        mutableStateOf((target.holding?.cost ?: target.price)?.let(::plainPrice).orEmpty())
+    }
     val shares = Alerts.parsePrice(sharesText)
     val cost = Alerts.parsePrice(costText)
+    val local = target.currency == "ARS"
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
             Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text("Tu posición en $symbol", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Tu posición en $title", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            if (targets.size > 1) {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    targets.forEachIndexed { i, t ->
+                        SegmentedButton(
+                            selected = i == selected,
+                            onClick = {
+                                selected = i
+                                onSelect(t)
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(i, targets.size),
+                        ) { Text(t.label) }
+                    }
+                }
+                if (local) {
+                    Text(
+                        "Se valúa con la cotización de ${target.symbol} en la Bolsa de Buenos Aires, en pesos. Va al total en pesos de tu cartera.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             OutlinedTextField(
                 value = sharesText,
                 onValueChange = { sharesText = it },
-                label = { Text("Cantidad") },
+                label = { Text(if (target.label == "CEDEARs") "Cantidad de CEDEARs" else "Cantidad") },
                 placeholder = { Text("Por ejemplo, 10 o 0.5") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -422,35 +473,38 @@ fun HoldingSheet(
             OutlinedTextField(
                 value = costText,
                 onValueChange = { costText = it },
-                label = { Text("Precio promedio de compra") },
+                label = { Text(if (local) "Precio promedio de compra (en pesos)" else "Precio promedio de compra") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 textStyle = MaterialTheme.typography.titleLarge.tabular(),
                 supportingText = {
-                    if (shares != null && cost != null) {
-                        val p = Position(shares * price, 0.0, shares * cost)
-                        Text(
-                            "Vale ${Format.price(p.value)} · ${Format.change(p.gain)} (${Format.percent(p.gainPercent)})",
-                            color = changeColor(p.gain),
-                        )
-                    } else {
-                        Text("Ahora está a ${Format.price(price)}")
+                    val price = target.price
+                    when {
+                        price == null -> Text("Buscando la cotización de ${target.symbol}…")
+                        shares != null && cost != null -> {
+                            val p = Position(shares * price, 0.0, shares * cost)
+                            Text(
+                                "Vale ${money(p.value, target.currency)} · ${Format.change(p.gain)} (${Format.percent(p.gainPercent)})",
+                                color = changeColor(p.gain),
+                            )
+                        }
+                        else -> Text("Ahora está a ${money(price, target.currency)}")
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
             Button(
                 onClick = {
-                    if (shares != null && cost != null) onSave(shares, cost)
+                    if (shares != null && cost != null) onSave(target.symbol, shares, cost)
                     onDismiss()
                 },
                 enabled = shares != null && cost != null,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text("Guardar") }
-            if (holding != null) {
+            if (target.holding != null) {
                 TextButton(
                     onClick = {
-                        onRemove()
+                        onRemove(target.symbol)
                         onDismiss()
                     },
                     modifier = Modifier.align(Alignment.CenterHorizontally),

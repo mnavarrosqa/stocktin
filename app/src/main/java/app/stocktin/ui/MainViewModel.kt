@@ -332,8 +332,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Al abrir una lista sugerida: se traen sus cotizaciones para mostrarla. */
-    fun previewSuggested(list: SuggestedList) {
-        val missing = list.symbols.filter { repository.quotes.value[it] == null }
+    fun previewSuggested(list: SuggestedList) = ensureQuotes(list.symbols)
+
+    /** Trae las cotizaciones que todavía no hay (por ejemplo, la de un CEDEAR). */
+    fun ensureQuotes(symbols: List<String>) {
+        val missing = symbols.filter { repository.quotes.value[it] == null }
         if (missing.isNotEmpty()) viewModelScope.launch { repository.refresh(missing) }
     }
 
@@ -547,6 +550,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setHolding(symbol: String, shares: Double, cost: Double) {
         repository.setHolding(symbol, shares, cost)
+        ensureQuotes(listOf(symbol))
         widgetsChanged()
     }
 
