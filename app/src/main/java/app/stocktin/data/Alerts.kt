@@ -44,13 +44,16 @@ object Alerts {
 
     /**
      * Lee un precio escrito a mano: "150", "150.5", "150,5", "1,234.5" o "1.234,5". Si tiene punto y
-     * coma, el último de los dos es el decimal; si tiene solo coma, la coma es el decimal.
+     * coma, el último de los dos es el decimal; si tiene solo coma, la coma es el decimal. Con
+     * [pesos], como se escribe en Argentina: un punto seguido de tres cifras es de miles ("19.990" son
+     * diecinueve mil novecientos noventa).
      */
-    fun parsePrice(text: String): Double? {
+    fun parsePrice(text: String, pesos: Boolean = false): Double? {
         val clean = text.trim().replace(" ", "").removePrefix("$")
         val decimal = when {
             ',' in clean && '.' in clean -> if (clean.lastIndexOf(',') > clean.lastIndexOf('.')) ',' else '.'
             ',' in clean -> ','
+            pesos && '.' in clean && clean.split('.').drop(1).all { it.length == 3 } -> ','
             else -> '.'
         }
         val thousands = if (decimal == ',') '.' else ','

@@ -24,6 +24,15 @@ object Format {
         return DecimalFormat(pattern, symbols).format(value)
     }
 
+    /** Pesos como en Argentina: 28.880,00. */
+    fun pesos(value: Double): String = DecimalFormat("#,##0.00", DecimalFormatSymbols(spanish)).format(value)
+
+    /** Un precio en su moneda: los pesos como en Argentina, lo demás como Yahoo. */
+    fun price(value: Double, currency: String?): String = if (currency == "ARS") pesos(value) else price(value)
+
+    /** "+1.234,50" en pesos o "+1,234.50" en lo demás. */
+    fun change(value: Double, currency: String?): String = sign(value) + price(abs(value), currency)
+
     fun percent(value: Double): String = sign(value) + DecimalFormat("0.00", symbols).format(abs(value)) + "%"
 
     fun change(value: Double): String = sign(value) + price(abs(value))

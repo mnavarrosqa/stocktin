@@ -62,3 +62,25 @@ class AlertsTest {
         assertEquals(alerts, Alerts.fromJson(Alerts.toJson(alerts)))
     }
 }
+
+class PesosTest {
+
+    @Test
+    fun `en pesos el punto es de miles`() {
+        assertEquals(19990.0, Alerts.parsePrice("19.990", pesos = true)!!, 1e-9)
+        assertEquals(1234567.0, Alerts.parsePrice("1.234.567", pesos = true)!!, 1e-9)
+        assertEquals(19990.5, Alerts.parsePrice("19.990,50", pesos = true)!!, 1e-9)
+        assertEquals(28880.0, Alerts.parsePrice("28880.00", pesos = true)!!, 1e-9)
+        assertEquals(12.5, Alerts.parsePrice("12.5", pesos = true)!!, 1e-9)
+        // En dólares, el punto sigue siendo decimal.
+        assertEquals(19.99, Alerts.parsePrice("19.990")!!, 1e-9)
+    }
+
+    @Test
+    fun `montos en pesos como en Argentina`() {
+        assertEquals("144.400,00", Format.pesos(144400.0))
+        assertEquals("28.880,00", Format.price(28880.0, "ARS"))
+        assertEquals("28,880.00", Format.price(28880.0, "USD"))
+        assertEquals("-1.100,00", Format.change(-1100.0, "ARS"))
+    }
+}

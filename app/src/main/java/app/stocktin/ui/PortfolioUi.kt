@@ -71,7 +71,8 @@ import app.stocktin.data.Quote
 import java.util.Locale
 
 /** "USD 1,234.56" (sin moneda si Yahoo no la dice). */
-fun money(value: Double, currency: String?): String = listOfNotNull(currency, Format.price(value)).joinToString(" ")
+fun money(value: Double, currency: String?): String =
+    if (currency == "ARS") "$ " + Format.pesos(value) else listOfNotNull(currency, Format.price(value)).joinToString(" ")
 
 /** Saldo oculto (el ojito de la cartera): los montos y las cantidades se tapan, los porcentajes no. */
 val LocalHideBalance = compositionLocalOf { false }
@@ -81,7 +82,7 @@ private const val HIDDEN = "••••••"
 /** [money], o la moneda con puntitos si el saldo está oculto. */
 @Composable
 private fun shownMoney(value: Double, currency: String?): String =
-    if (LocalHideBalance.current) listOfNotNull(currency, HIDDEN).joinToString(" ") else money(value, currency)
+    if (LocalHideBalance.current) listOfNotNull(if (currency == "ARS") "$" else currency, HIDDEN).joinToString(" ") else money(value, currency)
 
 /** [shares], o puntitos si el saldo está oculto. */
 @Composable
@@ -102,9 +103,9 @@ fun HideBalanceButton(onToggle: () -> Unit, tint: Color = LocalContentColor.curr
 
 /** "+123.45 (+1.20%)" en verde o rojo (solo "+1.20%" si el saldo está oculto). */
 @Composable
-private fun GainText(value: Double, percent: Double, style: androidx.compose.ui.text.TextStyle) {
+private fun GainText(value: Double, percent: Double, style: androidx.compose.ui.text.TextStyle, currency: String? = null) {
     Text(
-        if (LocalHideBalance.current) Format.percent(percent) else "${Format.change(value)} (${Format.percent(percent)})",
+        if (LocalHideBalance.current) Format.percent(percent) else "${Format.change(value, currency)} (${Format.percent(percent)})",
         style = style.tabular(),
         color = changeColor(value),
         fontWeight = FontWeight.SemiBold,
@@ -123,14 +124,14 @@ private fun allocationColors(): List<Color> = listOf(
 
 /** "▲ +56.77 (+1.33%) hoy" en una pastilla verde o roja. */
 @Composable
-private fun GainPill(value: Double, percent: Double, suffix: String) {
+private fun GainPill(value: Double, percent: Double, suffix: String, currency: String? = null) {
     val color = changeColor(value)
     Surface(shape = RoundedCornerShape(50), color = color.copy(alpha = 0.14f), contentColor = color) {
         Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(if (value >= 0) "▲" else "▼", style = MaterialTheme.typography.labelSmall)
             Spacer(Modifier.width(6.dp))
             Text(
-                (if (LocalHideBalance.current) Format.percent(percent) else "${Format.change(value)} (${Format.percent(percent)})") + " $suffix",
+                (if (LocalHideBalance.current) Format.percent(percent) else "${Format.change(value, currency)} (${Format.percent(percent)})") + " $suffix",
                 style = MaterialTheme.typography.labelLarge.tabular(),
                 fontWeight = FontWeight.SemiBold,
             )
@@ -196,11 +197,11 @@ fun PortfolioCard(holdings: Collection<Holding>, quotes: Map<String, Quote>, onT
             Column(Modifier.padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(shownMoney(p.value, main.currency), style = MaterialTheme.typography.headlineLarge.tabular(), fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    GainPill(p.dayChange, p.dayPercent, "hoy")
+                    GainPill(p.dayChange, p.dayPercent, "hoy", main.currency)
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text("Ganancia total", style = MaterialTheme.typography.labelSmall)
-                        GainText(p.gain, p.gainPercent, MaterialTheme.typography.labelLarge)
+                        GainText(p.gain, p.gainPercent, MaterialTheme.typography.labelLarge, main.currency)
                     }
                 }
                 AllocationBar(Portfolio.allocation(holdings, quotes, main.currency))
@@ -237,7 +238,7 @@ fun PortfolioSheet(holdings: Collection<Holding>, quotes: Map<String, Quote>, on
                 val p = total.position
                 Row(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalAlignment = Alignment.Bottom) {
                     Text(shownMoney(p.value, total.currency), style = MaterialTheme.typography.titleMedium.tabular(), modifier = Modifier.weight(1f))
-                    GainText(p.gain, p.gainPercent, MaterialTheme.typography.bodyMedium)
+                    GainText(p.gain, p.gainPercent, MaterialTheme.typography.bodyMedium, total.currency)
                 }
             }
             HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
@@ -254,14 +255,14 @@ fun PortfolioSheet(holdings: Collection<Holding>, quotes: Map<String, Quote>, on
                     Column(Modifier.weight(1f)) {
                         Text(h.symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(
-                            "${shownShares(h.shares)} × ${Format.price(h.cost)}",
+                            "${shownShares(h.shares)} × ${Format.price(h.cost, q?.currency)}",
                             style = MaterialTheme.typography.bodySmall.tabular(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(p?.let { shownMoney(it.value, q?.currency) } ?: "—", style = MaterialTheme.typography.titleSmall.tabular())
-                        if (p != null) GainText(p.gain, p.gainPercent, MaterialTheme.typography.bodySmall)
+                        if (p != null) GainText(p.gain, p.gainPercent, MaterialTheme.typography.bodySmall, q?.currency)
                     }
                 }
             }
@@ -316,14 +317,14 @@ fun PositionBlock(
             val p = Portfolio.position(holding, quote)
             Column(Modifier.padding(end = 8.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(shownMoney(p.value, quote.currency), style = MaterialTheme.typography.headlineMedium.tabular(), fontWeight = FontWeight.Bold)
-                GainPill(p.gain, p.gainPercent, "desde que compraste")
+                GainPill(p.gain, p.gainPercent, "desde que compraste", quote.currency)
                 if (quote.yearLow != null && quote.yearHigh != null && quote.yearHigh > quote.yearLow) {
-                    CostInRange(holding.cost, quote.price, quote.yearLow, quote.yearHigh)
+                    CostInRange(holding.cost, quote.price, quote.yearLow, quote.yearHigh, quote.currency)
                 }
                 val tiles = listOfNotNull(
                     Tile("Cantidad") { TileValue(shownShares(holding.shares)) },
-                    Tile("Precio promedio") { TileValue(Format.price(holding.cost)) },
-                    Tile("Hoy") { GainText(p.dayChange, p.dayPercent, MaterialTheme.typography.titleMedium) },
+                    Tile("Precio promedio") { TileValue(Format.price(holding.cost, quote.currency)) },
+                    Tile("Hoy") { GainText(p.dayChange, p.dayPercent, MaterialTheme.typography.titleMedium, quote.currency) },
                     Tile("Costo total") { TileValue(shownMoney(p.costBasis, quote.currency)) },
                     weight?.let { w -> Tile("De tu cartera") { TileValue("${(w * 100).roundToInt()}%") } },
                 )
@@ -361,7 +362,7 @@ private fun StatTile(label: String, modifier: Modifier, value: @Composable () ->
  * punto). El tramo entre los dos es verde si vas ganando y rojo si vas perdiendo.
  */
 @Composable
-private fun CostInRange(cost: Double, price: Double, low: Double, high: Double) {
+private fun CostInRange(cost: Double, price: Double, low: Double, high: Double, currency: String?) {
     val min = minOf(low, cost, price)
     val max = maxOf(high, cost, price)
     fun at(v: Double) = ((v - min) / (max - min)).toFloat().coerceIn(0f, 1f)
@@ -389,12 +390,12 @@ private fun CostInRange(cost: Double, price: Double, low: Double, high: Double) 
             drawCircle(Color.White, radius = r, center = Offset(b, y))
         }
         Row {
-            Text("◆ Promedio ${Format.price(cost)}", style = MaterialTheme.typography.labelMedium.tabular(), modifier = Modifier.weight(1f))
-            Text("● Ahora ${Format.price(price)}", style = MaterialTheme.typography.labelMedium.tabular(), color = gain)
+            Text("◆ Promedio ${Format.price(cost, currency)}", style = MaterialTheme.typography.labelMedium.tabular(), modifier = Modifier.weight(1f))
+            Text("● Ahora ${Format.price(price, currency)}", style = MaterialTheme.typography.labelMedium.tabular(), color = gain)
         }
         Row {
-            Text(Format.price(low), style = MaterialTheme.typography.labelSmall.tabular(), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            Text(Format.price(high), style = MaterialTheme.typography.labelSmall.tabular(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(Format.price(low, currency), style = MaterialTheme.typography.labelSmall.tabular(), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text(Format.price(high, currency), style = MaterialTheme.typography.labelSmall.tabular(), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -428,11 +429,11 @@ fun HoldingSheet(
     val target = targets[selected]
     var sharesText by remember(selected) { mutableStateOf(target.holding?.shares?.let(::shares).orEmpty()) }
     var costText by remember(selected, target.price != null) {
-        mutableStateOf((target.holding?.cost ?: target.price)?.let(::plainPrice).orEmpty())
+        mutableStateOf((target.holding?.cost ?: target.price)?.let { if (target.currency == "ARS") Format.pesos(it) else plainPrice(it) }.orEmpty())
     }
-    val shares = Alerts.parsePrice(sharesText)
-    val cost = Alerts.parsePrice(costText)
     val local = target.currency == "ARS"
+    val shares = Alerts.parsePrice(sharesText)
+    val cost = Alerts.parsePrice(costText, pesos = local)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
             Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp).navigationBarsPadding(),
@@ -481,10 +482,15 @@ fun HoldingSheet(
                     val price = target.price
                     when {
                         price == null -> Text("Buscando la cotización de ${target.symbol}…")
+                        // Un promedio 5 veces más chico o más grande que el precio suele ser un error de tipeo.
+                        cost != null && (cost < price / 5 || cost > price * 5) -> Text(
+                            "Ojo: es muy distinto del precio de ahora (${money(price, target.currency)}). ¿Está bien escrito?",
+                            color = MaterialTheme.colorScheme.error,
+                        )
                         shares != null && cost != null -> {
                             val p = Position(shares * price, 0.0, shares * cost)
                             Text(
-                                "Vale ${money(p.value, target.currency)} · ${Format.change(p.gain)} (${Format.percent(p.gainPercent)})",
+                                "Vale ${money(p.value, target.currency)} · ${Format.change(p.gain, target.currency)} (${Format.percent(p.gainPercent)})",
                                 color = changeColor(p.gain),
                             )
                         }

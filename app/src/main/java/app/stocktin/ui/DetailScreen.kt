@@ -504,7 +504,7 @@ private fun PositionCards(
             weight = Portfolio.weight(symbol, holdings.values, quotes),
             onEdit = { onEdit(0) },
             onToggleHidden = viewModel::toggleHideBalance,
-            emptyHint = if (local == null) "Cargá cuántas tenés y ves cuánto ganás" else "Acciones o ${local.label.lowercase()}: cargá cuántas tenés y ves cuánto ganás",
+            emptyHint = if (local == null) "Cargá cuántas tenés y ves cuánto ganás" else "Acciones o ${local.label.replaceFirstChar { it.lowercase() }}: cargá cuántas tenés y ves cuánto ganás",
         )
     }
     if (local != null && localHolding != null) {
@@ -517,11 +517,11 @@ private fun PositionCards(
                 weight = Portfolio.weight(local.symbol, holdings.values, quotes),
                 onEdit = { onEdit(1) },
                 onToggleHidden = viewModel::toggleHideBalance,
-                title = "Tus ${local.label.lowercase()} (${local.symbol})",
+                title = "Tus ${local.label.replaceFirstChar { it.lowercase() }} (${local.symbol})",
             )
         } else {
             Text(
-                "Buscando la cotización de ${local.symbol} para valuar tus ${local.label.lowercase()}…",
+                "Buscando la cotización de ${local.symbol} para valuar tus ${local.label.replaceFirstChar { it.lowercase() }}…",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
