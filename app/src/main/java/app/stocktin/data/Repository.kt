@@ -210,6 +210,13 @@ class Repository private constructor(private val context: Context) {
         if (shares <= 0) holdings - symbol else holdings + (symbol to Holding(symbol, shares, cost))
     }
 
+    /** Corrige los promedios en pesos mal leídos (ver [Portfolio.fixMistypedPesos]); devuelve los corregidos. */
+    fun fixMistypedPesos(): List<Holding> {
+        val fixed = _holdings.value.values.mapNotNull { Portfolio.fixMistypedPesos(it, _quotes.value[it.symbol]) }
+        if (fixed.isNotEmpty()) editHoldings { holdings -> holdings + fixed.associateBy { it.symbol } }
+        return fixed
+    }
+
     fun removeHolding(symbol: String) = editHoldings { it - symbol }
 
     @Synchronized

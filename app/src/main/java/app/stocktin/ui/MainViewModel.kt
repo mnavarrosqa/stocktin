@@ -233,6 +233,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     init {
         RefreshScheduler.schedule(app)
         viewModelScope.launch { repository.refreshCalendar() }
+        // Con las cotizaciones guardadas ya se pueden corregir los promedios en pesos mal leídos.
+        fixMistypedPesos()
         afterUpdate()
         if (settings.autoCheckUpdates && System.currentTimeMillis() - settings.lastUpdateCheck > UPDATE_CHECK_INTERVAL_MS) {
             checkForUpdates(manual = false)
@@ -255,6 +257,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val result = Widgets.refresh(getApplication(), extra = STRIP_SYMBOLS.map { it.first })
             if (!quiet && result.isFailure) showMessage("No se pudo actualizar. Revisá la conexión.")
+            fixMistypedPesos()
         }
     }
 
@@ -546,6 +549,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleHideBalance() {
         settings.hideBalance = !_hideBalance.value
         _hideBalance.value = settings.hideBalance
+    }
+
+    /** Avisa si se corrigió algún precio promedio en pesos que se había leído mal. */
+    private fun fixMistypedPesos() {
+        val fixed = repository.fixMistypedPesos()
+        if (fixed.isEmpty()) return
+        showMessage(
+            "Corregimos el precio promedio de " + fixed.joinToString { "${it.symbol} (${Format.pesos(it.cost)})" } +
+                ": se había leído mal el punto de miles",
+        )
     }
 
     fun setHolding(symbol: String, shares: Double, cost: Double) {

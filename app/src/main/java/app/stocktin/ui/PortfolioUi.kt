@@ -167,6 +167,7 @@ private fun AllocationBar(allocation: List<Pair<String, Double>>) {
  * Arriba de las listas: cuánto vale la cartera, cuánto cambió hoy, cuánto ganaste en total y cómo
  * se reparte. Con dólares y pesos, la moneda con más valor va grande y las demás en una línea.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PortfolioCard(holdings: Collection<Holding>, quotes: Map<String, Quote>, onToggleHidden: () -> Unit, onClick: () -> Unit) {
     val totals = Portfolio.totals(holdings, quotes)
@@ -196,9 +197,12 @@ fun PortfolioCard(holdings: Collection<Holding>, quotes: Map<String, Quote>, onT
             val p = main.position
             Column(Modifier.padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(shownMoney(p.value, main.currency), style = MaterialTheme.typography.headlineLarge.tabular(), fontWeight = FontWeight.Bold)
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Si no entra al lado de la pastilla (números largos), la ganancia total baja de renglón.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     GainPill(p.dayChange, p.dayPercent, "hoy", main.currency)
-                    Spacer(Modifier.width(12.dp))
                     Column {
                         Text("Ganancia total", style = MaterialTheme.typography.labelSmall)
                         GainText(p.gain, p.gainPercent, MaterialTheme.typography.labelLarge, main.currency)

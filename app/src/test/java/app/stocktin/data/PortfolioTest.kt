@@ -64,3 +64,18 @@ class PortfolioAllocationTest {
         assertEquals(null, Portfolio.weight("ARS", holdings, quotes))
     }
 }
+
+class MistypedPesosTest {
+
+    private fun q(price: Double, currency: String) = Quote("X", "X", price, 0.0, 0.0, null, currency, null)
+
+    @Test
+    fun `corrige el punto de miles mal leido en pesos`() {
+        assertEquals(19990.0, Portfolio.fixMistypedPesos(Holding("MSFT.BA", 5.0, 19.99), q(28880.0, "ARS"))!!.cost, 1e-6)
+        assertEquals(8060.0, Portfolio.fixMistypedPesos(Holding("GOOGL.BA", 124.0, 8.06), q(8040.0, "ARS"))!!.cost, 1e-6)
+        // Un promedio razonable, en dólares o sin cotización no se toca.
+        assertEquals(null, Portfolio.fixMistypedPesos(Holding("MSFT.BA", 5.0, 19990.0), q(28880.0, "ARS")))
+        assertEquals(null, Portfolio.fixMistypedPesos(Holding("MSFT", 5.0, 0.5), q(500.0, "USD")))
+        assertEquals(null, Portfolio.fixMistypedPesos(Holding("MSFT.BA", 5.0, 19.99), null))
+    }
+}

@@ -70,6 +70,16 @@ object Portfolio {
         return all.firstOrNull { it.first == symbol }?.second?.takeIf { all.size > 1 }
     }
 
+    /**
+     * Si un precio promedio en pesos quedó mil veces más chico que el de ahora, casi seguro se
+     * escribió "19.990" y se leyó 19,99 (antes de la v0.1.71): devuelve la posición corregida.
+     */
+    fun fixMistypedPesos(holding: Holding, quote: Quote?): Holding? {
+        if (quote?.currency != "ARS" || holding.cost <= 0) return null
+        val ratio = quote.price / holding.cost
+        return if (ratio in 300.0..3000.0) holding.copy(cost = holding.cost * 1000) else null
+    }
+
     fun toJson(holdings: Collection<Holding>): String = JSONArray().apply {
         holdings.forEach { put(JSONObject().put("symbol", it.symbol).put("shares", it.shares).put("cost", it.cost)) }
     }.toString()
