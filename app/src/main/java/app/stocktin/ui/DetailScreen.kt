@@ -504,7 +504,7 @@ private fun PositionCards(
             weight = Portfolio.weight(symbol, holdings.values, quotes),
             onEdit = { onEdit(0) },
             onToggleHidden = viewModel::toggleHideBalance,
-            emptyHint = if (local == null) "Cargá cuántas tenés y ves cuánto ganás" else "Acciones o ${local.label.replaceFirstChar { it.lowercase() }}: cargá cuántas tenés y ves cuánto ganás",
+            emptyHint = if (local == null) "Cargá cuántas tenés y ves cuánto ganás" else "Acciones o ${inSentence(local.label)}: cargá cuántas tenés y ves cuánto ganás",
         )
     }
     if (local != null && localHolding != null) {
@@ -517,11 +517,11 @@ private fun PositionCards(
                 weight = Portfolio.weight(local.symbol, holdings.values, quotes),
                 onEdit = { onEdit(1) },
                 onToggleHidden = viewModel::toggleHideBalance,
-                title = "Tus ${local.label.replaceFirstChar { it.lowercase() }} (${local.symbol})",
+                title = "Tus ${inSentence(local.label)} (${local.symbol})",
             )
         } else {
             Text(
-                "Buscando la cotización de ${local.symbol} para valuar tus ${local.label.replaceFirstChar { it.lowercase() }}…",
+                "Buscando la cotización de ${local.symbol} para valuar tus ${inSentence(local.label)}…",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
@@ -529,6 +529,9 @@ private fun PositionCards(
         }
     }
 }
+
+/** "CEDEARs" queda igual; "Acciones en pesos" pasa a "acciones en pesos" (para el medio de una frase). */
+private fun inSentence(label: String) = if (label.startsWith("CEDEAR")) label else label.lowercase()
 
 /** Dónde está el precio dentro del rango de 52 semanas. */
 @Composable
