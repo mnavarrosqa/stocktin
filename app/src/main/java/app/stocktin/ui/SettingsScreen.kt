@@ -68,7 +68,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.R
+import androidx.fragment.app.FragmentActivity
 import app.stocktin.alerts.AlertNotifier
+import app.stocktin.security.AppLock
 import app.stocktin.data.Alert
 import app.stocktin.data.Format
 import app.stocktin.data.Quote
@@ -107,6 +109,7 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
     var history by remember { mutableStateOf(false) }
     val alerts by viewModel.alerts.collectAsState()
     val agendaNotifications by viewModel.agendaNotifications.collectAsState()
+    val appLock by viewModel.appLock.collectAsState()
     val quotes by viewModel.quotes.collectAsState()
     val context = LocalContext.current
 
@@ -213,6 +216,36 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
                         }
                     }
                 }
+            }
+
+            Section("Seguridad") {
+                ToggleRow(
+                    title = "Bloquear con huella o PIN",
+                    summary = if (AppLock.available(context)) {
+                        "Al abrir Stocktin (y si estuvo más de un minuto cerrada) se pide la huella, la cara o el bloqueo del teléfono"
+                    } else {
+                        "Primero configurá una huella o un bloqueo de pantalla en el teléfono"
+                    },
+                    checked = appLock,
+                    onChange = { enable ->
+                        val activity = context as? FragmentActivity
+                        when {
+                            !AppLock.available(context) -> viewModel.showMessage("Configurá una huella o un bloqueo de pantalla en el teléfono primero")
+                            activity == null -> Unit
+                            // Para activarlo o sacarlo hay que confirmar con la huella.
+                            else -> AppLock.authenticate(
+                                activity,
+                                if (enable) "Activar el bloqueo" else "Sacar el bloqueo",
+                                "Confirmá con tu huella o el bloqueo del teléfono",
+                            ) { ok ->
+                                if (ok) {
+                                    viewModel.setAppLock(enable)
+                                    (activity as? MainActivity)?.applyRecentsPrivacy()
+                                }
+                            }
+                        }
+                    },
+                )
             }
 
             Section("Apariencia") {

@@ -2,7 +2,8 @@ package app.stocktin.ui
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
+import app.stocktin.security.AppLock
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -66,17 +67,24 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.R
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
+    /** Bloqueada hasta confirmar con huella o PIN (si está activado en Ajustes). */
+    private var locked by mutableStateOf(false)
+    private var authenticating = false
+    private var stoppedAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (savedInstanceState == null) handleIntent(intent)
         askNotificationsOnce()
+        locked = lockEnabled()
+        applyRecentsPrivacy()
         setContent {
             val themeMode by viewModel.themeMode.collectAsState()
             val dynamicColor by viewModel.dynamicColor.collectAsState()
@@ -85,6 +93,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalHideBalance provides hideBalance) {
                     App(viewModel, onUpdate = ::update)
                 }
+                if (locked) LockScreen(onUnlock = ::unlock, onExit = ::finish)
             }
         }
     }
@@ -97,11 +106,36 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         viewModel.setForeground(true)
+        // Más de un minuto afuera: se vuelve a pedir la huella.
+        if (stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > AppLock.GRACE_MS && lockEnabled()) locked = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (locked) unlock()
     }
 
     override fun onStop() {
         super.onStop()
         viewModel.setForeground(false)
+        if (!authenticating) stoppedAt = System.currentTimeMillis()
+    }
+
+    /** El bloqueo está activado y el teléfono tiene con qué confirmar (si no, no se bloquea para no dejar a nadie afuera). */
+    private fun lockEnabled() = Settings(this).appLock && AppLock.available(this)
+
+    private fun unlock() {
+        if (authenticating) return
+        authenticating = true
+        AppLock.authenticate(this, "Desbloquear Stocktin", "Con tu huella o el bloqueo del teléfono") { ok ->
+            authenticating = false
+            if (ok) locked = false
+        }
+    }
+
+    /** Con el bloqueo activado, la vista previa en "Recientes" queda tapada (Android 13 en adelante). */
+    fun applyRecentsPrivacy() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) setRecentsScreenshotEnabled(!Settings(this).appLock)
     }
 
     /** Una sola vez: permiso para los avisos de la agenda y las alertas (Android 13 en adelante). */

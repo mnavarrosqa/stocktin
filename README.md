@@ -86,6 +86,9 @@ búsqueda al lado.
   [`calendar.json`](app/src/main/assets/calendar.json): la app lo baja de GitHub, así que para sumar
   fechas alcanza con editar ese archivo en `main`, sin sacar una versión nueva. Las de los balances
   vienen de Yahoo Finance.
+- **Bloqueo con huella:** Ajustes → Seguridad → "Bloquear con huella o PIN". Al abrir la app (o si
+  estuvo más de un minuto cerrada) pide la huella, la cara o el bloqueo del teléfono, y la vista
+  previa en "Recientes" queda tapada.
 - **Compartir la app:** Ajustes → Acerca de → Compartir Stocktin manda el link de descarga.
 - El detalle trae las últimas **noticias** del símbolo y marca el máximo y el mínimo en el gráfico.
 - Con la app abierta los precios se actualizan cada 30 segundos.

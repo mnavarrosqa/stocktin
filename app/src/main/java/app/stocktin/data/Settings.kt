@@ -83,4 +83,9 @@ class Settings(context: Context) {
     var hideBalance: Boolean
         get() = prefs.getBoolean("hide_balance", false)
         set(value) = prefs.edit().putBoolean("hide_balance", value).apply()
+
+    /** Pedir huella, cara o el PIN del teléfono al abrir la app. */
+    var appLock: Boolean
+        get() = prefs.getBoolean("app_lock", false)
+        set(value) = prefs.edit().putBoolean("app_lock", value).apply()
 }

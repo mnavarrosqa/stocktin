@@ -87,6 +87,9 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
     implementation(libs.reorderable)
+    implementation(libs.androidx.biometric)
+    // La de biometric es vieja: se usa la misma que pide el resto de AndroidX.
+    implementation(libs.androidx.fragment.ktx)
 
     testImplementation(libs.junit)
     // org.json de verdad: el de android.jar en los tests locales es solo un esqueleto.

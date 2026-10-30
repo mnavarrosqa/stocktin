@@ -542,6 +542,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private val _appLock = MutableStateFlow(settings.appLock)
+    /** Pedir huella o PIN al abrir. */
+    val appLock: StateFlow<Boolean> = _appLock.asStateFlow()
+
+    fun setAppLock(enabled: Boolean) {
+        settings.appLock = enabled
+        _appLock.value = enabled
+        showMessage(if (enabled) "Listo: Stocktin va a pedir tu huella o PIN al abrir" else "Stocktin ya no pide huella al abrir")
+    }
+
     private val _hideBalance = MutableStateFlow(settings.hideBalance)
     /** El saldo de la cartera está oculto. */
     val hideBalance: StateFlow<Boolean> = _hideBalance.asStateFlow()
