@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
@@ -196,8 +197,7 @@ class ScreenshotTest {
         launch()
         openSymbol("NVDA")
         settle()
-        compose.onAllNodes(hasScrollToNodeAction()).onFirst().performScrollToNode(hasText("Editar"))
-        compose.onNodeWithText("Editar").performClick()
+        compose.onNodeWithText("Editar").performScrollTo().performClick()
         settle()
         compose.onNodeWithText("CEDEARs").performClick()
         settle()
