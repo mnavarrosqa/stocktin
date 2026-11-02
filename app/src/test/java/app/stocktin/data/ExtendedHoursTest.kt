@@ -40,6 +40,17 @@ class ExtendedHoursTest {
     }
 
     @Test
+    fun `el lunes a la manana la pre-apertura va despues de la rueda del viernes`() {
+        val friday = { h: Int, m: Int -> ZonedDateTime.of(2026, 10, 30, h, m, 0, 0, ny) }
+        val monday = { h: Int, m: Int -> ZonedDateTime.of(2026, 11, 2, h, m, 0, 0, ny) }
+        val regular = chart(listOf(friday(9, 30), friday(15, 55)), listOf(64.0, 62.0))
+        val extended = chart(listOf(monday(4, 0), monday(7, 55)), listOf(62.5, 63.2))
+        val (pre, post) = ExtendedHours.split(regular, extended)
+        assertNull(pre)
+        assertEquals(ExtSegment(listOf(62.5, 63.2), "Pre"), post)
+    }
+
+    @Test
     fun `sin datos fuera de horario no hay tramos`() {
         val regular = chart(listOf(at(28, 9, 30), at(28, 15, 55)), listOf(100.0, 101.0))
         assertEquals(null to null, ExtendedHours.split(regular, regular))

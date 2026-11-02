@@ -14,9 +14,10 @@ object ExtendedHours {
     /**
      * Los precios de [extended] (el gráfico con pre y post) que quedan antes y después de la rueda
      * de [regular]. Lo de antes es la pre-apertura; lo de después es el post-cierre del mismo día o,
-     * si ya es otro día (a la mañana, antes de que abra), la pre-apertura de hoy.
+     * si ya es otro día (a la mañana, antes de que abra), la pre-apertura de hoy. [maxGapSeconds]
+     * alcanza para un fin de semana largo: el lunes a la mañana la rueda que se ve es la del viernes.
      */
-    fun split(regular: Chart, extended: Chart, maxGapSeconds: Long = 20 * 3600): Pair<ExtSegment?, ExtSegment?> {
+    fun split(regular: Chart, extended: Chart, maxGapSeconds: Long = 4 * 24 * 3600): Pair<ExtSegment?, ExtSegment?> {
         val first = regular.timestamps.firstOrNull() ?: return null to null
         val last = regular.timestamps.last()
         val before = extended.timestamps.indices.filter { extended.timestamps[it] in (first - maxGapSeconds) until first }
