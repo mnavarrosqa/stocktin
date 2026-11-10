@@ -85,7 +85,10 @@ búsqueda al lado.
   un aviso (se apaga en Ajustes → Alertas). Las fechas de EE.UU. están en
   [`calendar.json`](app/src/main/assets/calendar.json): la app lo baja de GitHub, así que para sumar
   fechas alcanza con editar ese archivo en `main`, sin sacar una versión nueva. Las de los balances
-  vienen de Yahoo Finance.
+  vienen de Yahoo Finance. Tocando un dato (inflación, empleo, PBI o la Fed) se ve el **resultado**:
+  inflación anual, mensual y núcleo; empleos creados y desempleo; crecimiento del PBI; el rango de
+  tasas y su último cambio, con un gráfico de los anteriores (datos de FRED, la Reserva Federal de
+  St. Louis). Los que ya salieron muestran el número al lado en la agenda.
 - **Bloqueo con huella:** Ajustes → Seguridad → "Bloquear con huella o PIN". Al abrir la app (o si
   estuvo más de un minuto cerrada) pide la huella, la cara o el bloqueo del teléfono, y la vista
   previa en "Recientes" queda tapada.

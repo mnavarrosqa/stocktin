@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,6 +87,7 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
     var agendaSheet by remember { mutableStateOf(false) }
     var openedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
     val eventNews by viewModel.eventNews.collectAsState()
+    val econ by viewModel.econ.collectAsState()
     val upcoming = remember(agenda, now / 60_000) { Agenda.upcoming(agenda, now, days = 30) }
     // Un balance abre el símbolo; lo demás, la hoja del evento.
     val openEvent: (AgendaEvent) -> Unit = { event ->
@@ -111,89 +113,91 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
         }
     }
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
-        topBar = { LargeTopAppBar(title = { Text("Mercados", fontWeight = FontWeight.Bold) }, scrollBehavior = scroll) },
-    ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = refreshing,
-            onRefresh = { viewModel.refreshMarkets() },
-            modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
-        ) {
-            LazyVerticalGrid(
-                state = grid,
-                columns = GridCells.Adaptive(minSize = 160.dp),
-                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = bottomPadding + 16.dp),
-                modifier = Modifier.fillMaxSize(),
+    CompositionLocalProvider(LocalEcon provides econ) {
+        Scaffold(
+            modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+            topBar = { LargeTopAppBar(title = { Text("Mercados", fontWeight = FontWeight.Bold) }, scrollBehavior = scroll) },
+        ) { padding ->
+            PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = { viewModel.refreshMarkets() },
+                modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
             ) {
-                item(key = "status", span = { GridItemSpan(maxLineSpan) }) {
-                    MarketStatus(now, quotes["^GSPC"])
-                }
-                item(key = "agenda", span = { GridItemSpan(maxLineSpan) }) {
-                    // Lo más cercano; el resto del mes, en "Ver todo".
-                    AgendaCard(upcoming, now, openEvent) { agendaSheet = true }
-                }
-                item(key = "chips", span = { GridItemSpan(maxLineSpan) }) {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        modifier = Modifier.padding(vertical = 4.dp),
-                    ) {
-                        items(MARKET_SECTIONS.indices.toList()) { i ->
-                            AssistChip(
-                                onClick = { scope.launch { grid.animateScrollToItem(sectionStart[i]) } },
-                                label = { Text(MARKET_SECTIONS[i].title) },
-                            )
+                LazyVerticalGrid(
+                    state = grid,
+                    columns = GridCells.Adaptive(minSize = 160.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = bottomPadding + 16.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    item(key = "status", span = { GridItemSpan(maxLineSpan) }) {
+                        MarketStatus(now, quotes["^GSPC"])
+                    }
+                    item(key = "agenda", span = { GridItemSpan(maxLineSpan) }) {
+                        // Lo más cercano; el resto del mes, en "Ver todo".
+                        AgendaCard(upcoming, now, openEvent) { agendaSheet = true }
+                    }
+                    item(key = "chips", span = { GridItemSpan(maxLineSpan) }) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        ) {
+                            items(MARKET_SECTIONS.indices.toList()) { i ->
+                                AssistChip(
+                                    onClick = { scope.launch { grid.animateScrollToItem(sectionStart[i]) } },
+                                    label = { Text(MARKET_SECTIONS[i].title) },
+                                )
+                            }
                         }
                     }
-                }
-                item(key = "movers", span = { GridItemSpan(maxLineSpan) }) {
-                    MoversCard(
-                        kind = moversKind,
-                        quotes = movers[moversKind],
-                        selectedSymbol = selectedSymbol,
-                        onKind = viewModel::setMoversKind,
-                        onOpen = { viewModel.open(Screen.Detail(it)) },
-                    )
-                }
-                MARKET_SECTIONS.forEach { section ->
-                    item(key = "title-${section.title}", span = { GridItemSpan(maxLineSpan) }) {
-                        SectionTitle(section, quotes)
+                    item(key = "movers", span = { GridItemSpan(maxLineSpan) }) {
+                        MoversCard(
+                            kind = moversKind,
+                            quotes = movers[moversKind],
+                            selectedSymbol = selectedSymbol,
+                            onKind = viewModel::setMoversKind,
+                            onOpen = { viewModel.open(Screen.Detail(it)) },
+                        )
                     }
-                    if (section.style == SectionStyle.HEATMAP) {
-                        item(key = "heat-${section.title}", span = { GridItemSpan(maxLineSpan) }) {
-                            Heatmap(section, quotes, selectedSymbol) { viewModel.open(Screen.Detail(it)) }
+                    MARKET_SECTIONS.forEach { section ->
+                        item(key = "title-${section.title}", span = { GridItemSpan(maxLineSpan) }) {
+                            SectionTitle(section, quotes)
                         }
-                    } else {
-                        items(section.symbols, key = { "${section.title}-${it.first}" }) { (symbol, name) ->
-                            MarketCard(
-                                name = name,
-                                symbol = symbol,
-                                quote = quotes[symbol],
-                                selected = symbol == selectedSymbol,
-                                onClick = { viewModel.open(Screen.Detail(symbol)) },
-                            )
+                        if (section.style == SectionStyle.HEATMAP) {
+                            item(key = "heat-${section.title}", span = { GridItemSpan(maxLineSpan) }) {
+                                Heatmap(section, quotes, selectedSymbol) { viewModel.open(Screen.Detail(it)) }
+                            }
+                        } else {
+                            items(section.symbols, key = { "${section.title}-${it.first}" }) { (symbol, name) ->
+                                MarketCard(
+                                    name = name,
+                                    symbol = symbol,
+                                    quote = quotes[symbol],
+                                    selected = symbol == selectedSymbol,
+                                    onClick = { viewModel.open(Screen.Detail(symbol)) },
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-    }
-    if (agendaSheet) {
-        AgendaSheet(upcoming, now, openEvent) { agendaSheet = false }
-    }
-    openedEvent?.let { event ->
-        EventSheet(
-            event = event,
-            now = now,
-            quotes = quotes,
-            news = eventNews?.takeIf { it.first == AgendaInfo.newsQuery(event) }?.second,
-            onOpenSymbol = {
-                openedEvent = null
-                viewModel.open(Screen.Detail(it))
-            },
-            onDismiss = { openedEvent = null },
-        )
+        if (agendaSheet) {
+            AgendaSheet(upcoming, now, openEvent) { agendaSheet = false }
+        }
+        openedEvent?.let { event ->
+            EventSheet(
+                event = event,
+                now = now,
+                quotes = quotes,
+                news = eventNews?.takeIf { it.first == AgendaInfo.newsQuery(event) }?.second,
+                onOpenSymbol = {
+                    openedEvent = null
+                    viewModel.open(Screen.Detail(it))
+                },
+                onDismiss = { openedEvent = null },
+            )
+        }
     }
 }
 

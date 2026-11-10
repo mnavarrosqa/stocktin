@@ -42,6 +42,11 @@ class Repository private constructor(private val context: Context) {
     /** La agenda económica de EE.UU. (Fed, inflación, empleo, PBI). */
     val economy: StateFlow<List<AgendaEvent>> = _economy.asStateFlow()
 
+    private val _econ = MutableStateFlow<Map<AgendaKind, EconResult>>(emptyMap())
+    /** Los últimos resultados de inflación, empleo, PBI y tasa de la Fed. */
+    val econ: StateFlow<Map<AgendaKind, EconResult>> = _econ.asStateFlow()
+    @Volatile private var econFetched = 0L
+
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
 
@@ -197,6 +202,23 @@ class Repository private constructor(private val context: Context) {
         val events = runCatching { Agenda.parse(text) }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return
         writeAtomically(calendarFile, text)
         _economy.value = events
+    }
+
+    /** Trae de FRED los últimos datos económicos (como mucho cada 3 horas). Si falla, quedan los de antes. */
+    suspend fun refreshEcon(force: Boolean = false) {
+        if (!force && System.currentTimeMillis() - econFetched < 3 * 60 * 60 * 1000L && _econ.value.isNotEmpty()) return
+        econFetched = System.currentTimeMillis()
+        val since = java.time.LocalDate.now().minusYears(3).toString()
+        val series = EconData.SERIES.values.flatten().associateWith { id ->
+            runCatching { EconData.parseCsv(YahooApi.fred(id, since)) }.getOrDefault(emptyList())
+        }
+        val results = listOfNotNull(
+            runCatching { EconData.cpi(series.getValue("CPIAUCSL"), series.getValue("CPILFESL")) }.getOrNull(),
+            runCatching { EconData.jobs(series.getValue("PAYEMS"), series.getValue("UNRATE")) }.getOrNull(),
+            runCatching { EconData.gdp(series.getValue("A191RL1Q225SBEA")) }.getOrNull(),
+            runCatching { EconData.fed(series.getValue("DFEDTARL"), series.getValue("DFEDTARU")) }.getOrNull(),
+        )
+        if (results.isNotEmpty()) _econ.value = _econ.value + results.associateBy { it.kind }
     }
 
     /** La agenda guardada, o la que viene con la app si todavía no se bajó ninguna. */

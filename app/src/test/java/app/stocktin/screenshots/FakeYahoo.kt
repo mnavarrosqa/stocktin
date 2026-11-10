@@ -48,7 +48,23 @@ object FakeYahoo {
         "/v1/finance/screener" in url -> screener(param(url, "scrIds"))
         "/v1/finance/search" in url && "quotesCount=0" in url -> news(param(url, "q"))
         "/v1/finance/search" in url -> search(param(url, "q"))
+        "fred.stlouisfed.org" in url -> fred(param(url, "id"))
         else -> throw IOException("Sin red en las capturas: $url")
+    }
+
+    /** Series de FRED armadas: inflación cerca de 3%, empleos, PBI y la tasa de la Fed. */
+    private fun fred(id: String): String {
+        val months = (0 until 36).map { java.time.LocalDate.now().withDayOfMonth(1).minusMonths(36L - it) }
+        val rows = when (id) {
+            "CPIAUCSL" -> months.mapIndexed { i, d -> d to 300.0 * Math.pow(1.0025, i.toDouble()) + (i % 5) * 0.2 }
+            "CPILFESL" -> months.mapIndexed { i, d -> d to 310.0 * Math.pow(1.0026, i.toDouble()) }
+            "PAYEMS" -> months.mapIndexed { i, d -> d to 155000.0 + i * 140 + (i % 4) * 30 }
+            "UNRATE" -> months.mapIndexed { i, d -> d to 4.0 + (i % 3) * 0.1 }
+            "A191RL1Q225SBEA" -> months.filter { (it.monthValue - 1) % 3 == 0 }.mapIndexed { i, d -> d to 1.5 + (i % 4) * 0.6 }
+            "DFEDTARU", "DFEDTARL" -> months.mapIndexed { i, d -> d to (if (i < 30) 4.5 else 4.25) - if (id == "DFEDTARL") 0.25 else 0.0 }
+            else -> emptyList()
+        }
+        return "observation_date,$id\n" + rows.joinToString("\n") { "${it.first},${it.second}" }
     }
 
     private fun param(url: String, name: String): String =

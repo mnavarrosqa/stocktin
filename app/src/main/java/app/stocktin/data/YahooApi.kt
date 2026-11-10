@@ -133,6 +133,11 @@ object YahooApi {
      */
     suspend fun calendar(): String = withContext(Dispatchers.IO) { get(CALENDAR_URL) }
 
+    /** Una serie de FRED (Reserva Federal de St. Louis) en CSV, desde [since] (yyyy-MM-dd). */
+    suspend fun fred(series: String, since: String): String = withContext(Dispatchers.IO) {
+        get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=$series&cosd=$since")
+    }
+
     private const val CALENDAR_URL =
         "https://raw.githubusercontent.com/mnavarrosqa/stocktin/main/app/src/main/assets/calendar.json"
 

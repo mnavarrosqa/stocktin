@@ -31,6 +31,8 @@ data class AgendaEvent(
     val symbol: String? = null,
     /** Hora sin confirmar (balances con fecha estimada o sin hora). */
     val estimated: Boolean = false,
+    /** El mes que informa el dato (yyyy-MM; en el PBI, el primer mes del trimestre), si se sabe. */
+    val period: String? = null,
 ) {
     /** Para no avisar dos veces del mismo evento. */
     val key: String get() = "${kind.name}:${symbol ?: title}:$time"
@@ -53,6 +55,7 @@ object Agenda {
                     kind = AgendaKind.entries.firstOrNull { it.name == o.optString("kind") } ?: AgendaKind.OTHER,
                     title = o.getString("title"),
                     detail = o.optString("detail").takeIf { it.isNotBlank() },
+                    period = o.optString("period").takeIf { it.isNotBlank() },
                 )
             }.getOrNull()
         }

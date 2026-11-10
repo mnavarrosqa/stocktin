@@ -1,6 +1,16 @@
 package app.stocktin.ui
 
 import android.content.Intent
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import app.stocktin.data.EconData
+import app.stocktin.data.EconResult
+import kotlin.math.abs
 import android.provider.CalendarContract
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -153,7 +163,7 @@ private fun AgendaRow(event: AgendaEvent, now: Long, onOpen: (AgendaEvent) -> Un
                 val sub = listOfNotNull(
                     event.detail,
                     "Fecha estimada".takeIf { event.estimated },
-                    "Ya salió".takeIf { past },
+                    (LocalEcon.current[event.kind]?.takeIf { EconData.matches(event, it) }?.let { "Ya salió · ${it.short}" } ?: "Ya salió").takeIf { past },
                 ).joinToString(" · ")
                 if (sub.isNotEmpty()) {
                     Text(
@@ -231,6 +241,7 @@ fun EventSheet(
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
+            if (event.kind in EconData.SERIES) EconCard(event, LocalEcon.current[event.kind], now)
             Text(AgendaInfo.explain(event), style = MaterialTheme.typography.bodyLarge)
 
             Text("Qué mirar cuando sale", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -309,6 +320,87 @@ private fun countdown(time: Long, now: Long): String {
         else -> {
             val days = minutes / (24 * 60)
             if (days == 1L) "en 1 día" else "en $days días"
+        }
+    }
+}
+
+/** Los últimos resultados de los datos económicos, para la agenda y la hoja de cada evento. */
+val LocalEcon = compositionLocalOf<Map<AgendaKind, EconResult>> { emptyMap() }
+
+/**
+ * Los números del dato: el resultado (si ya salió) o el último publicado, los detalles y un gráfico
+ * de barras con los anteriores.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun EconCard(event: AgendaEvent, result: EconResult?, now: Long) {
+    val released = event.time <= now && EconData.matches(event, result)
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (result == null) {
+                Text("Buscando los últimos datos…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                return@Column
+            }
+            Text(
+                (if (released) "Resultado" else "Último dato publicado") + " · " + result.periodLabel,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(result.headline, style = MaterialTheme.typography.headlineMedium.tabular(), fontWeight = FontWeight.Bold)
+            if (result.details.isNotEmpty()) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    result.details.forEach { (label, value) ->
+                        Column {
+                            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(value, style = MaterialTheme.typography.titleSmall.tabular(), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+            if (result.history.size >= 2) HistoryBars(result.history, result.historyLabel)
+            Text(
+                "Fuente: FRED (Reserva Federal de St. Louis)" + if (!released && event.time <= now) ". El dato nuevo puede tardar unas horas en aparecer." else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Barras con los últimos valores: la última resaltada; las negativas, en rojo y hacia abajo. */
+@Composable
+private fun HistoryBars(history: List<Pair<String, Double>>, label: String) {
+    val accent = MaterialTheme.colorScheme.primary
+    val down = Down
+    val zero = MaterialTheme.colorScheme.outlineVariant
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Canvas(Modifier.fillMaxWidth().height(72.dp)) {
+            val values = history.map { it.second }
+            val max = maxOf(values.max(), 0.0)
+            val min = minOf(values.min(), 0.0)
+            val span = (max - min).takeIf { it > 1e-9 } ?: 1.0
+            fun y(v: Double) = (size.height * (1 - (v - min) / span)).toFloat()
+            val slot = size.width / values.size
+            val bar = slot * 0.62f
+            val base = y(0.0)
+            values.forEachIndexed { i, v ->
+                val last = i == values.lastIndex
+                val color = (if (v < 0) down else accent).copy(alpha = if (last) 1f else 0.38f)
+                val top = minOf(y(v), base)
+                val height = maxOf(abs(y(v) - base), 2f)
+                drawRoundRect(
+                    color,
+                    topLeft = Offset(i * slot + (slot - bar) / 2, top),
+                    size = Size(bar, height),
+                    cornerRadius = CornerRadius(3.dp.toPx()),
+                )
+            }
+            drawLine(zero, Offset(0f, base), Offset(size.width, base), strokeWidth = 1.dp.toPx())
+        }
+        Row {
+            Text(history.first().first, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text(history.last().first, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

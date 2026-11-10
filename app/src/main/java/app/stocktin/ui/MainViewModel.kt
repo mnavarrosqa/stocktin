@@ -86,6 +86,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val quotes = repository.quotes
     val alerts = repository.alerts
     val holdings = repository.holdings
+    val econ = repository.econ
 
     /** Lo que viene: la Fed, datos de EE.UU. y balances de tus símbolos. */
     val agenda: StateFlow<List<AgendaEvent>> =
@@ -101,6 +102,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Al abrir un evento de la agenda: sus noticias y las cotizaciones de lo que conviene mirar. */
     fun openEvent(event: AgendaEvent) {
+        viewModelScope.launch { repository.refreshEcon() }
         val query = AgendaInfo.newsQuery(event)
         val symbols = AgendaInfo.watch(event).map { it.first }
         viewModelScope.launch { repository.refresh(symbols) }
@@ -285,6 +287,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun selectTab(tab: Tab) {
         _tab.value = tab
         _stack.value = emptyList()
+        if (tab == Tab.MARKETS) viewModelScope.launch { repository.refreshEcon() }
         if (tab == Tab.MARKETS && (MARKET_SYMBOLS.any { repository.quotes.value[it] == null } || _movers.value.isEmpty())) {
             refreshMarkets()
         }
