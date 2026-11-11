@@ -51,7 +51,9 @@ object Widgets {
     suspend fun refresh(context: Context, extra: List<String> = emptyList()): Result<Unit> {
         val repository = Repository.get(context)
         val result = repository.refresh((symbolsInUse(context) + extra).distinct())
-        if (result.isSuccess) AlertNotifier.notify(context, repository.takeReachedAlerts())
+        // Sin permiso de notificaciones las alertas no se consumen: si no, se cumplían y se borraban
+        // sin que nadie se enterara.
+        if (result.isSuccess && AlertNotifier.canNotify(context)) AlertNotifier.notify(context, repository.takeReachedAlerts())
         repository.refreshCalendar()
         AgendaNotifier.notifyToday(context)
         updateAll(context)

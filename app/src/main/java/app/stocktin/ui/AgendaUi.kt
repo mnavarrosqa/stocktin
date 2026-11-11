@@ -327,6 +327,11 @@ private fun countdown(time: Long, now: Long): String {
 /** Los últimos resultados de los datos económicos, para la agenda y la hoja de cada evento. */
 val LocalEcon = compositionLocalOf<Map<AgendaKind, EconResult>> { emptyMap() }
 
+/** Si se están trayendo esos datos y cómo volver a pedirlos. */
+class EconStatus(val loading: Boolean = false, val retry: () -> Unit = {})
+
+val LocalEconStatus = compositionLocalOf { EconStatus() }
+
 /**
  * Los números del dato: el resultado (si ya salió) o el último publicado, los detalles y un gráfico
  * de barras con los anteriores.
@@ -338,7 +343,13 @@ fun EconCard(event: AgendaEvent, result: EconResult?, now: Long) {
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (result == null) {
-                Text("Buscando los últimos datos…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val status = LocalEconStatus.current
+                if (status.loading) {
+                    Text("Buscando los últimos datos…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Text("No se pudieron traer los datos. Revisá la conexión.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = status.retry) { Text("Reintentar") }
+                }
                 return@Column
             }
             Text(

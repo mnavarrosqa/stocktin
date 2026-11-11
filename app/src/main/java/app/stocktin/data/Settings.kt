@@ -88,4 +88,9 @@ class Settings(context: Context) {
     var appLock: Boolean
         get() = prefs.getBoolean("app_lock", false)
         set(value) = prefs.edit().putBoolean("app_lock", value).apply()
+
+    /** Ya se corrigieron (una vez) los promedios en pesos que se habían leído mal. */
+    var pesosFixed: Boolean
+        get() = prefs.getBoolean("pesos_fixed", false)
+        set(value) = prefs.edit().putBoolean("pesos_fixed", value).apply()
 }

@@ -430,13 +430,14 @@ fun HoldingSheet(
     onDismiss: () -> Unit,
 ) {
     var selected by remember { mutableStateOf(initial.coerceIn(0, targets.lastIndex)) }
-    val target = targets[selected]
+    val target = targets.getOrElse(selected) { targets.first() }
     var sharesText by remember(selected) { mutableStateOf(target.holding?.shares?.let(::shares).orEmpty()) }
     var costText by remember(selected, target.price != null) {
         mutableStateOf((target.holding?.cost ?: target.price)?.let { if (target.currency == "ARS") Format.pesos(it) else plainPrice(it) }.orEmpty())
     }
     val local = target.currency == "ARS"
-    val shares = Alerts.parsePrice(sharesText)
+    // En pesos, "1.500" son mil quinientos, también en la cantidad.
+    val shares = Alerts.parsePrice(sharesText, pesos = local)
     val cost = Alerts.parsePrice(costText, pesos = local)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(

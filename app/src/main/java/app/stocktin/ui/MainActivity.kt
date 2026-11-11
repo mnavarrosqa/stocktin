@@ -76,6 +76,8 @@ class MainActivity : FragmentActivity() {
     /** Bloqueada hasta confirmar con huella o PIN (si está activado en Ajustes). */
     private var locked by mutableStateOf(false)
     private var authenticating = false
+    /** Ya se mostró sola la huella para este bloqueo (si se cancela, queda el botón y no vuelve a saltar). */
+    private var prompted = false
     private var stoppedAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,10 +92,15 @@ class MainActivity : FragmentActivity() {
             val dynamicColor by viewModel.dynamicColor.collectAsState()
             val hideBalance by viewModel.hideBalance.collectAsState()
             StocktinTheme(themeMode = themeMode, dynamicColor = dynamicColor) {
-                CompositionLocalProvider(LocalHideBalance provides hideBalance) {
-                    App(viewModel, onUpdate = ::update)
+                // Bloqueada no se dibuja nada de la app: así tampoco quedan a la vista las hojas o
+                // los diálogos que estaban abiertos (van en otra ventana, encima de todo).
+                if (locked) {
+                    LockScreen(onUnlock = ::unlock, onExit = ::finish)
+                } else {
+                    CompositionLocalProvider(LocalHideBalance provides hideBalance) {
+                        App(viewModel, onUpdate = ::update)
+                    }
                 }
-                if (locked) LockScreen(onUnlock = ::unlock, onExit = ::finish)
             }
         }
     }
@@ -107,12 +114,18 @@ class MainActivity : FragmentActivity() {
         super.onStart()
         viewModel.setForeground(true)
         // Más de un minuto afuera: se vuelve a pedir la huella.
-        if (stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > AppLock.GRACE_MS && lockEnabled()) locked = true
+        if (!locked && stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > AppLock.GRACE_MS && lockEnabled()) {
+            locked = true
+            prompted = false
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        if (locked) unlock()
+        if (locked && !prompted) {
+            prompted = true
+            unlock()
+        }
     }
 
     override fun onStop() {

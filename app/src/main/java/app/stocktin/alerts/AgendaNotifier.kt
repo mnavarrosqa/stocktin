@@ -50,7 +50,7 @@ object AgendaNotifier {
         val text = when (event.kind) {
             AgendaKind.EARNINGS -> "${event.detail ?: event.symbol} presenta resultados $time. Suele moverse fuerte."
             AgendaKind.FED -> "La Fed anuncia las tasas $time.${event.detail?.let { " $it." }.orEmpty()} Mueve a todo el mercado."
-            else -> "Sale $time. Puede mover al mercado."
+            else -> if (event.time < System.currentTimeMillis()) "Salió $time. Tocá para ver el resultado." else "Sale $time. Puede mover al mercado."
         }
         return NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)

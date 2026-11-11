@@ -46,6 +46,10 @@ class Repository private constructor(private val context: Context) {
     /** Los últimos resultados de inflación, empleo, PBI y tasa de la Fed. */
     val econ: StateFlow<Map<AgendaKind, EconResult>> = _econ.asStateFlow()
     @Volatile private var econFetched = 0L
+    private val _econLoading = MutableStateFlow(false)
+    /** Se están trayendo los datos económicos. */
+    val econLoading: StateFlow<Boolean> = _econLoading.asStateFlow()
+    private val econLock = Mutex()
 
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
@@ -72,7 +76,10 @@ class Repository private constructor(private val context: Context) {
                 // Si la cotización vino del gráfico (sin fecha de balance), se conserva la que había.
                 _quotes.update { old ->
                     old + fresh.associate { q ->
-                        q.symbol to if (q.earningsTime == null) q.copy(earningsTime = old[q.symbol]?.earningsTime, earningsEstimate = old[q.symbol]?.earningsEstimate == true) else q
+                        val before = old[q.symbol]
+                        val withEarnings = if (q.earningsTime == null) q.copy(earningsTime = before?.earningsTime, earningsEstimate = before?.earningsEstimate == true) else q
+                        // Si esta vez falló el gráfico del día, queda el minigráfico que había.
+                        q.symbol to if (withEarnings.spark.isEmpty()) withEarnings.copy(spark = before?.spark.orEmpty()) else withEarnings
                     }
                 }
                 saveQuotes()
@@ -205,9 +212,13 @@ class Repository private constructor(private val context: Context) {
     }
 
     /** Trae de FRED los últimos datos económicos (como mucho cada 3 horas). Si falla, quedan los de antes. */
-    suspend fun refreshEcon(force: Boolean = false) {
-        if (!force && System.currentTimeMillis() - econFetched < 3 * 60 * 60 * 1000L && _econ.value.isNotEmpty()) return
+    suspend fun refreshEcon(force: Boolean = false) = econLock.withLock {
+        // Solo se espera 3 horas si están los cuatro datos: si faltó alguno, se vuelve a intentar.
+        val complete = _econ.value.keys.containsAll(EconData.SERIES.keys)
+        val elapsed = System.currentTimeMillis() - econFetched
+        if (!force && elapsed < (if (complete) 3 * 60 * 60 * 1000L else 60_000L)) return@withLock
         econFetched = System.currentTimeMillis()
+        _econLoading.value = true
         val since = java.time.LocalDate.now().minusYears(3).toString()
         val series = EconData.SERIES.values.flatten().associateWith { id ->
             // Un reintento por si se corta la conexión.
@@ -222,6 +233,7 @@ class Repository private constructor(private val context: Context) {
             runCatching { EconData.fed(series.getValue("DFEDTARL"), series.getValue("DFEDTARU")) }.getOrNull(),
         )
         if (results.isNotEmpty()) _econ.value = _econ.value + results.associateBy { it.kind }
+        _econLoading.value = false
     }
 
     /** La agenda guardada, o la que viene con la app si todavía no se bajó ninguna. */

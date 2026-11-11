@@ -88,6 +88,7 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
     var openedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
     val eventNews by viewModel.eventNews.collectAsState()
     val econ by viewModel.econ.collectAsState()
+    val econLoading by viewModel.econLoading.collectAsState()
     val upcoming = remember(agenda, now / 60_000) { Agenda.upcoming(agenda, now, days = 30) }
     // Un balance abre el símbolo; lo demás, la hoja del evento.
     val openEvent: (AgendaEvent) -> Unit = { event ->
@@ -113,7 +114,7 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
         }
     }
 
-    CompositionLocalProvider(LocalEcon provides econ) {
+    CompositionLocalProvider(LocalEcon provides econ, LocalEconStatus provides EconStatus(econLoading, viewModel::retryEcon)) {
         Scaffold(
             modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
             topBar = { LargeTopAppBar(title = { Text("Mercados", fontWeight = FontWeight.Bold) }, scrollBehavior = scroll) },

@@ -28,6 +28,7 @@ import app.stocktin.widget.Widgets
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -87,6 +88,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val alerts = repository.alerts
     val holdings = repository.holdings
     val econ = repository.econ
+    val econLoading = repository.econLoading
+
+    fun retryEcon() {
+        viewModelScope.launch { repository.refreshEcon(force = true) }
+    }
 
     /** Lo que viene: la Fed, datos de EE.UU. y balances de tus símbolos. */
     val agenda: StateFlow<List<AgendaEvent>> =
@@ -452,7 +458,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         searchJob = viewModelScope.launch {
             delay(300)
             _searching.value = true
-            _results.value = runCatching { YahooApi.search(text) }.getOrElse { emptyList() }
+            val found = runCatching { YahooApi.search(text) }.getOrElse { emptyList() }
+            // Si mientras tanto se escribió otra cosa, este resultado ya no va.
+            ensureActive()
+            _results.value = found
             _searching.value = false
         }
     }
@@ -469,7 +478,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             newsJob?.cancel()
             _news.value = symbol to null
             newsJob = viewModelScope.launch {
-                _news.value = symbol to runCatching { YahooApi.news(symbol) }.getOrDefault(emptyList())
+                val items = runCatching { YahooApi.news(symbol) }.getOrDefault(emptyList())
+                ensureActive()
+                _news.value = symbol to items
             }
         }
         loadChart(symbol, _chart.value?.takeIf { it.symbol == symbol }?.range ?: ChartRange.DAY)
@@ -496,7 +507,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         chartJob = viewModelScope.launch {
             val other = benchmark?.let { async { runCatching { YahooApi.chart(it, range) }.getOrNull() } }
             val extended = if (range == ChartRange.DAY) async { runCatching { YahooApi.chartExtended(symbol) }.getOrNull() } else null
-            _chart.value = runCatching { YahooApi.chart(symbol, range) }.fold(
+            val loaded = runCatching { YahooApi.chart(symbol, range) }
+            // Si se cambió de rango o de símbolo mientras cargaba, este pedido se descarta: sin esto,
+            // el pedido viejo podía pisar al nuevo con un "No se pudo cargar el gráfico".
+            ensureActive()
+            _chart.value = loaded.fold(
                 onSuccess = { ChartState(symbol, range, it, loading = false, benchmark = other?.await(), extended = extended?.await()) },
                 onFailure = { ChartState(symbol, range, null, loading = false, error = "No se pudo cargar el gráfico") },
             )
@@ -566,6 +581,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Avisa si se corrigió algún precio promedio en pesos que se había leído mal. */
     private fun fixMistypedPesos() {
+        // Una sola vez, cuando ya hay cotización de todo lo que está en pesos: después, un promedio
+        // mucho más bajo que el precio puede ser simplemente una compra de hace muchos años.
+        if (settings.pesosFixed) return
+        val quotes = repository.quotes.value
+        if (repository.holdings.value.keys.any { it.endsWith(".BA") && quotes[it] == null }) return
+        settings.pesosFixed = true
         val fixed = repository.fixMistypedPesos()
         if (fixed.isEmpty()) return
         showMessage(
