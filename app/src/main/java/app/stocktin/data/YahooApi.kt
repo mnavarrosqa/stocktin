@@ -135,7 +135,8 @@ object YahooApi {
 
     /** Una serie de FRED (Reserva Federal de St. Louis) en CSV, desde [since] (yyyy-MM-dd). */
     suspend fun fred(series: String, since: String): String = withContext(Dispatchers.IO) {
-        get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=$series&cosd=$since")
+        // FRED corta la conexión si el pedido dice ser un navegador y no lo es: va con nombre propio.
+        get("https://fred.stlouisfed.org/graph/fredgraph.csv?id=$series&cosd=$since", userAgent = "Stocktin/1.0 (Android)")
     }
 
     private const val CALENDAR_URL =
@@ -143,12 +144,12 @@ object YahooApi {
 
     class HttpException(val code: Int) : IOException("Yahoo respondió $code")
 
-    private fun get(url: String): String {
+    private fun get(url: String, userAgent: String = USER_AGENT): String {
         fakeResponses?.let { return it(url) }
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 10_000
             readTimeout = 15_000
-            setRequestProperty("User-Agent", USER_AGENT)
+            setRequestProperty("User-Agent", userAgent)
             setRequestProperty("Accept", "application/json,text/plain,*/*")
         }
         try {

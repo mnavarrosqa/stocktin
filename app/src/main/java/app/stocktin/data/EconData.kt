@@ -58,16 +58,29 @@ object EconData {
     private fun monthLabel(date: LocalDate) = monthYear.format(date).replaceFirstChar { it.uppercase() }
     private fun shortLabel(date: LocalDate) = shortMonth.format(date).replace(".", "")
 
+    /**
+     * Los valores por mes, con los meses que faltan entre dos conocidos estimados con el promedio
+     * geométrico de los de al lado (por ejemplo, octubre de 2025, que no se publicó por el cierre
+     * del gobierno de EE.UU. y sin el que no se puede calcular la inflación anual de octubre de 2026).
+     */
+    private fun withGaps(series: List<Pair<LocalDate, Double>>): Map<LocalDate, Double> {
+        val map = series.toMap().toMutableMap()
+        series.zipWithNext().forEach { (a, b) ->
+            if (a.first.plusMonths(2) == b.first) map[a.first.plusMonths(1)] = Math.sqrt(a.second * b.second)
+        }
+        return map
+    }
+
     /** Inflación: anual y mensual del índice general y anual del núcleo (sin alimentos ni energía). */
     fun cpi(all: List<Pair<LocalDate, Double>>, core: List<Pair<LocalDate, Double>>): EconResult? {
-        val byDate = all.toMap()
+        val byDate = withGaps(all)
         fun yoy(date: LocalDate) = byDate[date.minusYears(1)]?.let { (byDate.getValue(date) / it - 1) * 100 }
         val dates = all.map { it.first }.filter { yoy(it) != null }
         val last = dates.lastOrNull() ?: return null
         val annual = yoy(last) ?: return null
         val previous = dates.getOrNull(dates.size - 2)?.let(::yoy)
         val monthly = byDate[last.minusMonths(1)]?.let { (byDate.getValue(last) / it - 1) * 100 }
-        val coreMap = core.toMap()
+        val coreMap = withGaps(core)
         val coreAnnual = coreMap[last]?.let { v -> coreMap[last.minusYears(1)]?.let { (v / it - 1) * 100 } }
         return EconResult(
             kind = AgendaKind.CPI,

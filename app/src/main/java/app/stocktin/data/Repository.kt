@@ -210,7 +210,10 @@ class Repository private constructor(private val context: Context) {
         econFetched = System.currentTimeMillis()
         val since = java.time.LocalDate.now().minusYears(3).toString()
         val series = EconData.SERIES.values.flatten().associateWith { id ->
-            runCatching { EconData.parseCsv(YahooApi.fred(id, since)) }.getOrDefault(emptyList())
+            // Un reintento por si se corta la conexión.
+            runCatching { EconData.parseCsv(YahooApi.fred(id, since)) }
+                .recoverCatching { EconData.parseCsv(YahooApi.fred(id, since)) }
+                .getOrDefault(emptyList())
         }
         val results = listOfNotNull(
             runCatching { EconData.cpi(series.getValue("CPIAUCSL"), series.getValue("CPILFESL")) }.getOrNull(),

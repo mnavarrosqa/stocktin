@@ -74,3 +74,15 @@ class EconDataTest {
         assertTrue(EconData.matches(fedEvent, fed.copy(asOf = "2026-12-10")))
     }
 }
+
+class EconGapTest {
+    @Test
+    fun `un mes sin publicar se estima para la inflacion anual`() {
+        val start = LocalDate.of(2025, 9, 1)
+        // Falta octubre de 2025.
+        val all = (0..13).filter { it != 1 }.map { start.plusMonths(it.toLong()) to 300.0 * Math.pow(1.0025, it.toDouble()) }
+        val r = EconData.cpi(all, emptyList())!!
+        assertEquals("2026-10", r.period)
+        assertEquals("3.0% anual", r.headline)
+    }
+}

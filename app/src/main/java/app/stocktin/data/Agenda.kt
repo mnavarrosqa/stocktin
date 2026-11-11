@@ -131,10 +131,11 @@ object AgendaInfo {
 
     /** Qué buscar en las noticias de Yahoo. */
     fun newsQuery(event: AgendaEvent): String = when (event.kind) {
-        AgendaKind.FED -> "Federal Reserve interest rate decision"
-        AgendaKind.CPI -> "CPI inflation report"
-        AgendaKind.JOBS -> "jobs report nonfarm payrolls"
-        AgendaKind.GDP -> "US GDP report"
+        // Palabras cortas: con frases largas el buscador de Yahoo no devuelve noticias.
+        AgendaKind.FED -> "Federal Reserve"
+        AgendaKind.CPI -> "inflation"
+        AgendaKind.JOBS -> "jobs report"
+        AgendaKind.GDP -> "GDP"
         AgendaKind.EARNINGS -> event.symbol ?: event.title
         AgendaKind.OTHER -> event.title
     }
