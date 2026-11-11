@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
 import androidx.compose.foundation.horizontalScroll
@@ -44,7 +45,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -105,7 +105,6 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
     var holdingSheet by remember(symbol) { mutableStateOf<Int?>(null) }
     val local = Cedears.localFor(symbol, quote)
     val inAnyList = lists.any { symbol in it.symbols }
-    val snackbar = rememberMessages(viewModel)
     val fold = rememberFoldingFeature()
     val tabletop = fold?.isTabletop == true
 
@@ -152,7 +151,6 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         val sheet = holdingSheet
         if (sheet != null && quote != null) {
@@ -408,13 +406,8 @@ private fun CompareRow(
 /** Rangos del gráfico como texto, el elegido resaltado (estilo Robinhood / Bolsa de Apple). */
 @Composable
 private fun RangeSelector(current: ChartRange, onSelect: (ChartRange) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
+    // Todos a la vista, repartidos en el ancho (antes el último quedaba cortado).
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp)) {
         ChartRange.entries.forEach { r ->
             val selected = r == current
             Surface(
@@ -422,12 +415,16 @@ private fun RangeSelector(current: ChartRange, onSelect: (ChartRange) -> Unit) {
                 shape = CircleShape,
                 color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                 contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
             ) {
                 Text(
                     r.label,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
         }

@@ -51,7 +51,6 @@ import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -70,6 +69,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.data.Format
+import app.stocktin.data.Holding
+import app.stocktin.data.Cedears
 import app.stocktin.data.Portfolio
 import app.stocktin.data.SuggestedList
 import app.stocktin.data.Suggestions
@@ -98,7 +99,6 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
     var menu by remember { mutableStateOf(false) }
     var nameDialog by remember { mutableStateOf<NameDialog?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
-    val snackbar = rememberMessages(viewModel)
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val haptics = LocalHapticFeedback.current
 
@@ -190,7 +190,6 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = bottomPadding)) },
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = refreshing,
@@ -273,6 +272,7 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                                 selected = symbol == selectedSymbol,
                                 editing = editing,
                                 dragging = dragging,
+                                gainPercent = positionGain(symbol, holdings, quotes),
                                 onClick = { viewModel.open(Screen.Detail(symbol)) },
                                 onToggleValue = { viewModel.setShowValue(!showValue) },
                                 onRemove = { viewModel.removeSymbol(symbol) },
@@ -509,4 +509,15 @@ private fun Summary(quotes: List<Quote>, status: String, sortMode: SortMode, onS
             }
         }
     }
+}
+
+/**
+ * Cuánto ganás (en %) con lo que tenés de [symbol]: sus acciones o, si no, sus CEDEARs (cada uno
+ * contra su propia cotización).
+ */
+private fun positionGain(symbol: String, holdings: Map<String, Holding>, quotes: Map<String, Quote>): Double? {
+    val own = holdings[symbol]?.let { h -> quotes[symbol]?.let { Portfolio.position(h, it).gainPercent } }
+    if (own != null) return own
+    val local = Cedears.localFor(symbol, quotes[symbol])?.symbol ?: return null
+    return holdings[local]?.let { h -> quotes[local]?.let { Portfolio.position(h, it).gainPercent } }
 }

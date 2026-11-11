@@ -44,7 +44,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -103,7 +102,6 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
     val refreshing by viewModel.refreshing.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
     val dynamicColor by viewModel.dynamicColor.collectAsState()
-    val snackbar = rememberMessages(viewModel)
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val uri = LocalUriHandler.current
     var history by remember { mutableStateOf(false) }
@@ -116,7 +114,6 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = { LargeTopAppBar(title = { Text("Ajustes", fontWeight = FontWeight.Bold) }, scrollBehavior = scroll) },
-        snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = bottomPadding)) },
     ) { padding ->
         Column(
             Modifier

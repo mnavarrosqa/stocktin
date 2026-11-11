@@ -176,6 +176,8 @@ fun QuoteRow(
     dragModifier: Modifier = Modifier,
     /** La manija ≡ del modo edición: arrastra sin esperar. */
     handleModifier: Modifier = Modifier,
+    /** Tu ganancia total en este símbolo (en %), si lo tenés en cartera. */
+    gainPercent: Double? = null,
 ) {
     val background by animateColorAsState(
         when {
@@ -203,7 +205,26 @@ fun QuoteRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(if (compact) 1f else 1.4f)) {
-                Text(symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                    if (gainPercent != null && !editing) {
+                        // En cartera: la billetera y cuánto ganás desde que compraste.
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            painterResource(R.drawable.ic_wallet),
+                            contentDescription = "En tu cartera",
+                            tint = changeColor(gainPercent),
+                            modifier = Modifier.size(13.dp),
+                        )
+                        Text(
+                            " " + Format.percent(gainPercent),
+                            style = MaterialTheme.typography.labelSmall.tabular(),
+                            color = changeColor(gainPercent),
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                    }
+                }
                 if (quote != null) {
                     Text(
                         quote.name,

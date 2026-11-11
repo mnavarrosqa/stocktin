@@ -56,6 +56,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -200,6 +201,13 @@ private fun App(viewModel: MainViewModel, onUpdate: () -> Unit) {
             enter = fadeIn() + slideInVertically { it / 8 },
             exit = fadeOut() + slideOutVertically { it / 8 },
         ) { SearchScreen(viewModel) }
+    }
+    // Los avisos (con su Deshacer) salen en un solo lugar para toda la app: arriba de la barra
+    // flotante, o al pie si hay un detalle o la búsqueda encima.
+    val messages = rememberMessages(viewModel)
+    val overBar = isWideScreen() || stack.isEmpty()
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        SnackbarHost(messages, Modifier.navigationBarsPadding().padding(bottom = if (overBar) 88.dp else 8.dp))
     }
     val showDialog by viewModel.updateDialog.collectAsState()
     val update by viewModel.update.collectAsState()
