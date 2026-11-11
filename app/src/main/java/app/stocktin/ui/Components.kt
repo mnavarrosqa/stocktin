@@ -208,7 +208,7 @@ fun QuoteRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(symbol, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
                     if (gainPercent != null && !editing) {
-                        // En cartera: la billetera y cuánto ganás desde que compraste.
+                        // En cartera: la billetera acá y, abajo, cuánto ganás desde que compraste.
                         Spacer(Modifier.width(6.dp))
                         Icon(
                             painterResource(R.drawable.ic_wallet),
@@ -216,23 +216,28 @@ fun QuoteRow(
                             tint = changeColor(gainPercent),
                             modifier = Modifier.size(13.dp),
                         )
-                        Text(
-                            " " + Format.percent(gainPercent),
-                            style = MaterialTheme.typography.labelSmall.tabular(),
-                            color = changeColor(gainPercent),
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                        )
                     }
                 }
                 if (quote != null) {
-                    Text(
-                        quote.name,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row {
+                        if (gainPercent != null && !editing) {
+                            Text(
+                                Format.percent(gainPercent) + " · ",
+                                style = MaterialTheme.typography.bodySmall.tabular(),
+                                color = changeColor(gainPercent),
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        }
+                        Text(
+                            quote.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 } else {
                     Placeholder(Modifier.padding(top = 4.dp).width(110.dp).height(12.dp))
                 }
