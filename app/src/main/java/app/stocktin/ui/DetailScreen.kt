@@ -1,6 +1,7 @@
 package app.stocktin.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.ScaffoldDefaults
@@ -70,6 +71,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.data.Cedears
 import app.stocktin.data.ChartCompare
+import app.stocktin.data.CompanyInfo
 import app.stocktin.data.ChartRange
 import app.stocktin.data.ExtSegment
 import app.stocktin.data.ExtendedHours
@@ -106,6 +108,8 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
     val holdings by viewModel.holdings.collectAsState()
     val notes by viewModel.notes.collectAsState()
     val trades by viewModel.trades.collectAsState()
+    val companyState by viewModel.company.collectAsState()
+    val company = companyState?.takeIf { it.first == symbol }?.second
     var noteEditor by remember(symbol) { mutableStateOf(false) }
     val holding = holdings[symbol]
     // Qué se está cargando en la hoja de la posición: 0 = acciones, 1 = CEDEARs (null = cerrada).
@@ -187,6 +191,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 price = quote.price,
                 onCreate = { viewModel.addAlert(symbol, it) },
                 onCreateMove = { viewModel.addMoveAlert(symbol, it) },
+                onCreateSignal = { viewModel.addSignalAlert(symbol, it) },
                 onDismiss = { alertSheet = false },
             )
         }
@@ -253,6 +258,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                         .verticalScroll(rememberScrollState()),
                 ) {
                     Stats(quote)
+                    company?.let { CompanyCard(it) }
                     PositionCards(viewModel, symbol, quote, local, holdings, quotes) { holdingSheet = it }
                     NotesBlock(notes[symbol]) { noteEditor = true }
                     AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
@@ -268,6 +274,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
             ) {
                 top(if (inPane) 320.dp else 260.dp)
                 Stats(quote)
+                company?.let { CompanyCard(it) }
                 PositionCards(viewModel, symbol, quote, local, holdings, quotes) { holdingSheet = it }
                 NotesBlock(notes[symbol]) { noteEditor = true }
                 AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
@@ -460,6 +467,11 @@ private fun Stats(quote: Quote) {
         quote.dayLow?.let { "Mínimo del día" to Format.price(it) },
         quote.volume?.takeIf { it > 0 }?.let { "Volumen" to Format.compact(it.toDouble()) },
         quote.marketCap?.takeIf { it > 0 }?.let { "Cap. de mercado" to Format.compact(it) },
+        quote.pe?.let { "P/E (12 meses)" to String.format(Locale.US, "%.1f", it) },
+        quote.eps?.let { "Ganancia por acción" to Format.price(it) },
+        quote.dividendYield?.let { "Dividendo anual" to String.format(Locale.US, "%.2f%%", it) },
+        quote.avg50?.let { "Media 50 días" to Format.price(it) },
+        quote.avg200?.let { "Media 200 días" to Format.price(it) },
         nextEarnings(quote)?.let { "Próximo balance" to it },
     )
     BoxWithConstraints(Modifier.padding(horizontal = 16.dp)) {
@@ -549,6 +561,67 @@ private fun PositionCards(
 
 /** "CEDEARs" queda igual; "Acciones en pesos" pasa a "acciones en pesos" (para el medio de una frase). */
 private fun inSentence(label: String) = if (label.startsWith("CEDEAR")) label else label.lowercase()
+
+/** A qué se dedica la empresa y cómo le fue en los últimos balances (lo que ganó contra lo esperado). */
+@Composable
+private fun CompanyCard(info: CompanyInfo) {
+    var expanded by remember { mutableStateOf(false) }
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (info.summary != null || info.sector != null) {
+                Text("Sobre la empresa", style = MaterialTheme.typography.titleSmall)
+                listOfNotNull(info.sector, info.industry, info.employees?.let { "${Format.compact(it.toDouble())} empleados" })
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { Text(it.joinToString(" · "), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                info.summary?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = if (expanded) Int.MAX_VALUE else 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable { expanded = !expanded },
+                    )
+                    Text(
+                        if (expanded) "Ver menos" else "Ver más",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable { expanded = !expanded },
+                    )
+                }
+            }
+            if (info.earnings.isNotEmpty()) {
+                Text("Últimos balances", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
+                Text(
+                    "Ganancia por acción contra lo que esperaban los analistas",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                info.earnings.takeLast(4).reversed().forEach { e ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(e.quarter, style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(72.dp))
+                        Text(
+                            Format.price(e.actual) + (e.estimate?.let { " vs " + Format.price(it) } ?: ""),
+                            style = MaterialTheme.typography.bodyMedium.tabular(),
+                            modifier = Modifier.weight(1f),
+                        )
+                        e.surprise?.let {
+                            Text(
+                                (if (it >= 0) "Superó " else "Por debajo ") + Format.percent(it),
+                                style = MaterialTheme.typography.labelLarge.tabular(),
+                                color = changeColor(it),
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 /** Tus notas sobre el símbolo: por qué lo compraste, a cuánto venderías… */
 @Composable

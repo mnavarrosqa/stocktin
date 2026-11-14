@@ -51,6 +51,16 @@ object AlertNotifier {
                     "${alert.symbol} $verb ${Format.percent(quote.changePercent).removePrefix("+").removePrefix("-")} hoy" to
                         "Está a ${Format.price(quote.price)} · tu alerta era moverse más de ${Format.percent(alert.target).removePrefix("+")}"
                 }
+                AlertKind.YEAR_HIGH -> "${alert.symbol} toca su máximo del año" to
+                    "Está a ${Format.price(quote.price)}, lo más alto de las últimas 52 semanas. Hoy ${Format.percent(quote.changePercent)}"
+                AlertKind.YEAR_LOW -> "${alert.symbol} toca su mínimo del año" to
+                    "Está a ${Format.price(quote.price)}, lo más bajo de las últimas 52 semanas. Hoy ${Format.percent(quote.changePercent)}"
+                AlertKind.MA200_CROSS -> {
+                    // alert.above dice de qué lado estaba antes del cruce.
+                    val verb = if (alert.above) "cayó debajo de" else "superó"
+                    "${alert.symbol} $verb su media de 200 días" to
+                        "Está a ${Format.price(quote.price)}; la media de 200 días es ${quote.avg200?.let(Format::price) ?: "—"}. Suele leerse como cambio de tendencia."
+                }
             }
             val notification = NotificationCompat.Builder(context, CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification)

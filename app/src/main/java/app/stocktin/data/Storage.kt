@@ -72,6 +72,11 @@ object Storage {
         put("time", q.time)
         putOpt("earningsTime", q.earningsTime)
         put("earningsEstimate", q.earningsEstimate)
+        putOpt("pe", q.pe)
+        putOpt("eps", q.eps)
+        putOpt("dividendYield", q.dividendYield)
+        putOpt("avg50", q.avg50)
+        putOpt("avg200", q.avg200)
     }
 
     private fun quoteFromJson(o: JSONObject): Quote {
@@ -101,6 +106,11 @@ object Storage {
             time = o.optLong("time"),
             earningsTime = if (o.has("earningsTime")) o.getLong("earningsTime") else null,
             earningsEstimate = o.optBoolean("earningsEstimate"),
+            pe = o.double("pe"),
+            eps = o.double("eps"),
+            dividendYield = o.double("dividendYield"),
+            avg50 = o.double("avg50"),
+            avg200 = o.double("avg200"),
         )
     }
 

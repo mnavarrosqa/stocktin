@@ -79,6 +79,20 @@ object YahooApi {
         YahooParser.parseNews(get("$HOST/v1/finance/search?q=$q&quotesCount=0&newsCount=8&listsCount=0"))
     }
 
+    /** A qué se dedica la empresa y sus últimos balances (pide el crumb, como la cotización completa). */
+    suspend fun company(symbol: String): CompanyInfo? = withContext(Dispatchers.IO) {
+        val s = URLEncoder.encode(symbol, "UTF-8")
+        val url = "$HOST/v10/finance/quoteSummary/$s?modules=assetProfile,earningsHistory&crumb="
+        val body = try {
+            get(url + URLEncoder.encode(crumb(), "UTF-8"))
+        } catch (e: HttpException) {
+            if (e.code != 401 && e.code != 403) throw e
+            crumb = null
+            get(url + URLEncoder.encode(crumb(), "UTF-8"))
+        }
+        Company.parse(body)
+    }
+
     /** Las acciones de EE.UU. que más suben, bajan o se operan hoy. */
     suspend fun movers(kind: Movers, count: Int = 8): List<Quote> = withContext(Dispatchers.IO) {
         val url = "$HOST/v1/finance/screener/predefined/saved?scrIds=${kind.screenerId}&count=$count&formatted=false"

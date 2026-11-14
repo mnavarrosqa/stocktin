@@ -32,6 +32,15 @@ data class Quote(
     val earningsTime: Long? = null,
     /** La fecha del balance es estimada (la empresa todavía no la confirmó). */
     val earningsEstimate: Boolean = false,
+    /** Relación precio/ganancia de los últimos 12 meses. */
+    val pe: Double? = null,
+    /** Ganancia por acción de los últimos 12 meses. */
+    val eps: Double? = null,
+    /** Rendimiento por dividendo anual, en %. */
+    val dividendYield: Double? = null,
+    /** Precio promedio de los últimos 50 y 200 días. */
+    val avg50: Double? = null,
+    val avg200: Double? = null,
 ) {
     val isUp: Boolean get() = change >= 0
     val isOpen: Boolean get() = marketState == "REGULAR" || quoteType == "CRYPTOCURRENCY"

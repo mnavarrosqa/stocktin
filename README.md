@@ -103,6 +103,10 @@ búsqueda al lado.
 - **Widget de cartera:** total, cambio de hoy, ganancia y las posiciones más grandes; respeta el ojito.
 - **Compras y ventas:** en "Tu posición", cargá cada operación con su fecha; el promedio y la ganancia
   realizada se calculan solos, y en el gráfico se marcan las compras (▲) y las ventas (▼).
+- **Señales:** alertas cuando una acción toca su máximo o su mínimo de 52 semanas, o cruza su media
+  de 200 días.
+- **Datos de la empresa:** P/E, ganancia por acción, dividendo y medias de 50 y 200 días; a qué se
+  dedica y los últimos balances (ganancia por acción contra lo esperado).
 - **Compartir la app:** Ajustes → Acerca de → Compartir Stocktin manda el link de descarga.
 - El detalle trae las últimas **noticias** del símbolo y marca el máximo y el mínimo en el gráfico.
 - Con la app abierta los precios se actualizan cada 30 segundos.

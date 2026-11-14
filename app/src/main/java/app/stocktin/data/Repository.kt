@@ -95,7 +95,13 @@ class Repository private constructor(private val context: Context) {
                         val before = old[q.symbol]
                         val withEarnings = if (q.earningsTime == null) q.copy(earningsTime = before?.earningsTime, earningsEstimate = before?.earningsEstimate == true) else q
                         // Si esta vez falló el gráfico del día, queda el minigráfico que había.
-                        q.symbol to if (withEarnings.spark.isEmpty()) withEarnings.copy(spark = before?.spark.orEmpty()) else withEarnings
+                        val withSpark = if (withEarnings.spark.isEmpty()) withEarnings.copy(spark = before?.spark.orEmpty()) else withEarnings
+                        // Si vino del gráfico (sin P/E ni medias), quedan los datos de la vez anterior.
+                        q.symbol to if (withSpark.avg200 == null && before != null) {
+                            withSpark.copy(pe = before.pe, eps = before.eps, dividendYield = before.dividendYield, avg50 = before.avg50, avg200 = before.avg200)
+                        } else {
+                            withSpark
+                        }
                     }
                 }
                 saveQuotes()
@@ -173,6 +179,16 @@ class Repository private constructor(private val context: Context) {
         return alert
     }
 
+    /** Una señal: máximo o mínimo de 52 semanas, o cruce de la media de 200 días. */
+    fun addSignalAlert(symbol: String, kind: AlertKind): Alert {
+        val quote = _quotes.value[symbol]
+        // Para el cruce: de qué lado de la media está hoy.
+        val above = quote?.avg200?.let { quote.price >= it } ?: true
+        val alert = Alert(UUID.randomUUID().toString().take(8), symbol, 0.0, above, System.currentTimeMillis(), kind)
+        editAlerts { it + alert }
+        return alert
+    }
+
     /** Avisar cuando [symbol] se mueva más de [percent] % en el día. */
     fun addMoveAlert(symbol: String, percent: Double): Alert {
         val alert = Alert(
@@ -199,8 +215,10 @@ class Repository private constructor(private val context: Context) {
                 alerts.mapNotNull { a ->
                     when {
                         a.id !in ids -> a
-                        a.kind == AlertKind.DAY_MOVE -> a.copy(lastFired = today)
-                        else -> null
+                        a.kind == AlertKind.PRICE -> null
+                        // El cruce de la media queda armado para el próximo cruce, del otro lado.
+                        a.kind == AlertKind.MA200_CROSS -> a.copy(lastFired = today, above = !a.above)
+                        else -> a.copy(lastFired = today)
                     }
                 }
             }

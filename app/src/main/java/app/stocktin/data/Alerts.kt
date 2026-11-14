@@ -19,7 +19,16 @@ data class Alert(
     val lastFired: String? = null,
 )
 
-enum class AlertKind { PRICE, DAY_MOVE }
+enum class AlertKind {
+    PRICE,
+    DAY_MOVE,
+    /** Toca un nuevo máximo de 52 semanas. */
+    YEAR_HIGH,
+    /** Toca un nuevo mínimo de 52 semanas. */
+    YEAR_LOW,
+    /** Cruza su media de 200 días ([Alert.above]: de qué lado estaba). */
+    MA200_CROSS,
+}
 
 object Alerts {
 
@@ -38,6 +47,11 @@ object Alerts {
                 AlertKind.DAY_MOVE -> alert.lastFired != today &&
                     (quote.time == 0L || java.time.Instant.ofEpochSecond(quote.time).atZone(zone).toLocalDate().toString() == today) &&
                     kotlin.math.abs(quote.changePercent) >= alert.target
+                // Las señales, como mucho una vez por día.
+                AlertKind.YEAR_HIGH -> alert.lastFired != today && quote.yearHigh != null && quote.price >= quote.yearHigh * 0.999
+                AlertKind.YEAR_LOW -> alert.lastFired != today && quote.yearLow != null && quote.price <= quote.yearLow * 1.001
+                AlertKind.MA200_CROSS -> alert.lastFired != today && quote.avg200 != null &&
+                    (if (alert.above) quote.price < quote.avg200 else quote.price > quote.avg200)
             }
             if (hit) alert to quote else null
         }

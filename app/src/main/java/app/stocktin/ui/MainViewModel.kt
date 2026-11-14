@@ -7,10 +7,12 @@ import app.stocktin.data.AgendaEvent
 import app.stocktin.data.Backup
 import app.stocktin.data.AgendaInfo
 import app.stocktin.data.Alert
+import app.stocktin.data.AlertKind
 import app.stocktin.data.Chart
 import app.stocktin.data.Dollar
 import app.stocktin.data.Format
 import app.stocktin.data.ChartCompare
+import app.stocktin.data.CompanyInfo
 import app.stocktin.data.ChartRange
 import app.stocktin.data.MARKET_SYMBOLS
 import app.stocktin.data.Movers
@@ -534,8 +536,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         loadChart(symbol, _chart.value?.takeIf { it.symbol == symbol }?.range ?: ChartRange.DAY)
+        loadCompany(symbol)
         if (repository.quotes.value[symbol] == null) {
             viewModelScope.launch { repository.refresh(listOf(symbol)) }
+        }
+    }
+
+    /** Lo que se sabe de la empresa abierta en el detalle (null mientras carga o si no hay). */
+    private val _company = MutableStateFlow<Pair<String, CompanyInfo?>?>(null)
+    val company: StateFlow<Pair<String, CompanyInfo?>?> = _company.asStateFlow()
+    private var companyJob: Job? = null
+
+    private fun loadCompany(symbol: String) {
+        if (_company.value?.first == symbol) return
+        companyJob?.cancel()
+        _company.value = symbol to null
+        // Solo acciones: los índices, monedas y cripto no tienen perfil ni balances.
+        if (symbol.any { it in "^=" } || symbol.endsWith("-USD")) return
+        companyJob = viewModelScope.launch {
+            val info = runCatching { YahooApi.company(symbol) }.getOrNull()
+            ensureActive()
+            _company.value = symbol to info
         }
     }
 
@@ -596,6 +617,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val price = repository.quotes.value[symbol]?.price ?: return
         val alert = repository.addAlert(symbol, target, price)
         showMessage("Te avisamos cuando $symbol ${if (alert.above) "suba" else "baje"} a ${Format.price(target)}")
+    }
+
+    fun addSignalAlert(symbol: String, kind: AlertKind) {
+        repository.addSignalAlert(symbol, kind)
+        showMessage(
+            when (kind) {
+                AlertKind.YEAR_HIGH -> "Te avisamos cuando $symbol toque su máximo del año"
+                AlertKind.YEAR_LOW -> "Te avisamos cuando $symbol toque su mínimo del año"
+                else -> "Te avisamos cuando $symbol cruce su media de 200 días"
+            },
+        )
     }
 
     fun addMoveAlert(symbol: String, percent: Double) {

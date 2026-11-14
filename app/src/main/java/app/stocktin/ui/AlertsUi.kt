@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Button
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -93,6 +95,7 @@ fun AlertsBlock(alerts: List<Alert>, quote: Quote, onNew: () -> Unit, onRemove: 
 @Composable
 fun AlertRow(alert: Alert, quote: Quote?, showSymbol: Boolean, onRemove: () -> Unit, onClick: (() -> Unit)? = null) {
     val move = alert.kind == AlertKind.DAY_MOVE
+    val signal = alert.kind in setOf(AlertKind.YEAR_HIGH, AlertKind.YEAR_LOW, AlertKind.MA200_CROSS)
     val price = quote?.price
     Row(
         Modifier
@@ -102,7 +105,12 @@ fun AlertRow(alert: Alert, quote: Quote?, showSymbol: Boolean, onRemove: () -> U
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when {
-            move -> Text("±", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(24.dp))
+            move || signal -> Text(
+                if (move) "±" else "◆",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.width(24.dp),
+            )
             else -> Icon(
                 if (alert.above) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                 null,
@@ -114,13 +122,26 @@ fun AlertRow(alert: Alert, quote: Quote?, showSymbol: Boolean, onRemove: () -> U
             Text(
                 (if (showSymbol) "${alert.symbol} · " else "") + when {
                     move -> "Se mueve más de ${Format.percent(alert.target).removePrefix("+")} en el día"
+                    alert.kind == AlertKind.YEAR_HIGH -> "Toca su máximo de 52 semanas"
+                    alert.kind == AlertKind.YEAR_LOW -> "Toca su mínimo de 52 semanas"
+                    alert.kind == AlertKind.MA200_CROSS -> if (alert.above) "Cae debajo de su media de 200 días" else "Supera su media de 200 días"
                     alert.above -> "Sube a ${Format.price(alert.target)}"
                     else -> "Baja a ${Format.price(alert.target)}"
                 },
                 style = MaterialTheme.typography.bodyLarge.tabular(),
                 fontWeight = FontWeight.Medium,
             )
-            if (move && quote != null) {
+            if (signal && quote != null) {
+                Text(
+                    when (alert.kind) {
+                        AlertKind.YEAR_HIGH -> "Máximo ${quote.yearHigh?.let(Format::price) ?: "—"} · ahora ${Format.price(quote.price)}"
+                        AlertKind.YEAR_LOW -> "Mínimo ${quote.yearLow?.let(Format::price) ?: "—"} · ahora ${Format.price(quote.price)}"
+                        else -> "Media ${quote.avg200?.let(Format::price) ?: "—"} · ahora ${Format.price(quote.price)}"
+                    },
+                    style = MaterialTheme.typography.bodySmall.tabular(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else if (move && quote != null) {
                 Text(
                     "Hoy ${Format.percent(quote.changePercent)} · suena una vez por día",
                     style = MaterialTheme.typography.bodySmall.tabular(),
@@ -152,16 +173,28 @@ fun NewAlertSheet(
     onCreate: (Double) -> Unit,
     onCreateMove: (Double) -> Unit,
     onDismiss: () -> Unit,
+    onCreateSignal: (AlertKind) -> Unit = {},
 ) {
     val context = LocalContext.current
-    var move by remember { mutableStateOf(false) }
+    // 0: precio, 1: se mueve mucho, 2: una señal.
+    var mode by remember { mutableStateOf(0) }
+    val move = mode == 1
+    var signal by remember { mutableStateOf(AlertKind.YEAR_HIGH) }
     var text by remember { mutableStateOf(plain(price * 1.05)) }
     var percentText by remember { mutableStateOf("5") }
     val target = Alerts.parsePrice(text)
     val percent = Alerts.parsePrice(percentText)?.takeIf { it < 100 }
-    val valid = if (move) percent != null else target != null && target != price
+    val valid = when (mode) {
+        1 -> percent != null
+        2 -> true
+        else -> target != null && target != price
+    }
     val create = {
-        if (move) percent?.let(onCreateMove) else target?.let(onCreate)
+        when (mode) {
+            1 -> percent?.let(onCreateMove)
+            2 -> onCreateSignal(signal)
+            else -> target?.let(onCreate)
+        }
     }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         // Aunque diga que no, la alerta queda creada; en Ajustes se explica cómo activarlas.
@@ -175,14 +208,28 @@ fun NewAlertSheet(
         ) {
             Text("Avisarme cuando $symbol…", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                SegmentedButton(selected = !move, onClick = { move = false }, shape = SegmentedButtonDefaults.itemShape(0, 2)) {
-                    Text("Llegue a un precio")
-                }
-                SegmentedButton(selected = move, onClick = { move = true }, shape = SegmentedButtonDefaults.itemShape(1, 2)) {
-                    Text("Se mueva mucho")
+                listOf("Un precio", "Se mueve", "Una señal").forEachIndexed { i, label ->
+                    SegmentedButton(selected = mode == i, onClick = { mode = i }, shape = SegmentedButtonDefaults.itemShape(i, 3)) {
+                        Text(label, maxLines = 1)
+                    }
                 }
             }
-            if (move) {
+            if (mode == 2) {
+                // Señales que miran muchos inversores: extremos del año y la media de 200 días.
+                listOf(
+                    AlertKind.YEAR_HIGH to "Toque su máximo de 52 semanas",
+                    AlertKind.YEAR_LOW to "Toque su mínimo de 52 semanas",
+                    AlertKind.MA200_CROSS to "Cruce su media de 200 días (para arriba o para abajo)",
+                ).forEach { (kind, label) ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { signal = kind }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = signal == kind, onClick = { signal = kind })
+                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            } else if (move) {
                 OutlinedTextField(
                     value = percentText,
                     onValueChange = { percentText = it },
@@ -256,7 +303,7 @@ fun NewAlertSheet(
             ) { Text("Crear alerta") }
             Text(
                 "Se revisa cada vez que se actualizan los precios (con la app abierta o en segundo plano, según Ajustes)." +
-                    if (move) "" else " Suena una vez y se borra.",
+                    if (mode == 0) " Suena una vez y se borra." else " Suena como mucho una vez por día.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

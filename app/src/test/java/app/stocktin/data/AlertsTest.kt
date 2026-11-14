@@ -84,3 +84,21 @@ class PesosTest {
         assertEquals("-1.100,00", Format.change(-1100.0, "ARS"))
     }
 }
+
+class SignalAlertsTest {
+    private fun q(price: Double, high: Double = 200.0, low: Double = 100.0, avg200: Double = 150.0) =
+        mapOf("X" to Quote("X", "X", price, 0.0, 0.0, null, null, null, yearHigh = high, yearLow = low, avg200 = avg200))
+
+    @Test
+    fun `maximo, minimo y cruce de la media de 200`() {
+        val high = Alert("h", "X", 0.0, true, 0, AlertKind.YEAR_HIGH)
+        val low = Alert("l", "X", 0.0, true, 0, AlertKind.YEAR_LOW)
+        val crossDown = Alert("c", "X", 0.0, above = true, created = 0, kind = AlertKind.MA200_CROSS)
+        assertEquals(listOf("h"), Alerts.reached(listOf(high, low, crossDown), q(200.0), "2026-11-14").map { it.first.id })
+        assertEquals(listOf("l", "c"), Alerts.reached(listOf(high, low, crossDown), q(100.0), "2026-11-14").map { it.first.id })
+        // Una vez por día.
+        assertEquals(emptyList<String>(), Alerts.reached(listOf(high.copy(lastFired = "2026-11-14")), q(201.0), "2026-11-14").map { it.first.id })
+        // Estaba abajo de la media: suena al subir.
+        assertEquals(listOf("u"), Alerts.reached(listOf(crossDown.copy(id = "u", above = false)), q(160.0), "2026-11-14").map { it.first.id })
+    }
+}

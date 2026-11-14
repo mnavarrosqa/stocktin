@@ -118,6 +118,13 @@ object YahooParser {
             // Con fecha estimada Yahoo da un rango: se toma el principio.
             earningsTime = (o.optLong("earningsTimestampStart").takeIf { it > 0 } ?: o.optLong("earningsTimestamp").takeIf { it > 0 }),
             earningsEstimate = o.optBoolean("isEarningsDateEstimate", false),
+            pe = o.optDoubleOrNull("trailingPE")?.takeIf { it > 0 },
+            eps = o.optDoubleOrNull("epsTrailingTwelveMonths"),
+            // "dividendYield" ya viene en %; si no está, el de los últimos 12 meses (que viene en fracción).
+            dividendYield = o.optDoubleOrNull("dividendYield")?.takeIf { it > 0 }
+                ?: o.optDoubleOrNull("trailingAnnualDividendYield")?.takeIf { it > 0 }?.times(100),
+            avg50 = o.optDoubleOrNull("fiftyDayAverage")?.takeIf { it > 0 },
+            avg200 = o.optDoubleOrNull("twoHundredDayAverage")?.takeIf { it > 0 },
         )
     }
 
