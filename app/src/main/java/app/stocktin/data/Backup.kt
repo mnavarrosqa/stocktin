@@ -9,6 +9,9 @@ data class BackupData(
     val holdings: List<Holding>,
     val alerts: List<Alert>,
     val notes: Map<String, String>,
+    val trades: List<Trade> = emptyList(),
+    /** Lo que valía la cartera cada día, por moneda. */
+    val history: Map<String, Map<String, Double>> = emptyMap(),
 )
 
 /** La copia de seguridad: un archivo JSON para guardar en el teléfono, en Drive o donde quieras. */
@@ -25,6 +28,8 @@ object Backup {
         .put("holdings", JSONArray(Portfolio.toJson(data.holdings)))
         .put("alerts", JSONArray(Alerts.toJson(data.alerts)))
         .put("notes", JSONObject(data.notes))
+        .put("trades", JSONArray(Trades.toJson(data.trades)))
+        .put("history", JSONObject(PortfolioHistory.toJson(data.history)))
         .toString(2)
 
     /** Lee una copia. Falla con un mensaje claro si el archivo no es de Stocktin. */
@@ -37,6 +42,8 @@ object Backup {
             holdings = o.optJSONArray("holdings")?.let { Portfolio.fromJson(it.toString()) }.orEmpty(),
             alerts = o.optJSONArray("alerts")?.let { Alerts.fromJson(it.toString()) }.orEmpty(),
             notes = notes?.keys()?.asSequence()?.associateWith { notes.getString(it) }?.filterValues { it.isNotBlank() }.orEmpty(),
+            trades = o.optJSONArray("trades")?.let { Trades.fromJson(it.toString()) }.orEmpty(),
+            history = o.optJSONObject("history")?.let { PortfolioHistory.fromJson(it.toString()) }.orEmpty(),
         )
     }
 
@@ -48,7 +55,7 @@ object Backup {
             n(data.holdings.size, "posición", "posiciones"),
             n(data.alerts.size, "alerta", "alertas"),
             n(data.notes.size, "nota", "notas"),
-        )
+        ) + listOfNotNull(data.trades.size.takeIf { it > 0 }?.let { n(it, "operación", "operaciones") })
         return parts.dropLast(1).joinToString(", ") + " y " + parts.last()
     }
 }

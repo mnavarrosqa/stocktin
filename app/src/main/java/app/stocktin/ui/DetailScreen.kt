@@ -105,6 +105,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
     val alerts = allAlerts.filter { it.symbol == symbol }
     val holdings by viewModel.holdings.collectAsState()
     val notes by viewModel.notes.collectAsState()
+    val trades by viewModel.trades.collectAsState()
     var noteEditor by remember(symbol) { mutableStateOf(false) }
     val holding = holdings[symbol]
     // Qué se está cargando en la hoja de la posición: 0 = acciones, 1 = CEDEARs (null = cerrada).
@@ -175,6 +176,9 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 onSave = { target, shares, cost -> viewModel.setHolding(target, shares, cost) },
                 onRemove = { viewModel.removeHolding(it) },
                 onDismiss = { holdingSheet = null },
+                trades = trades,
+                onAddTrade = viewModel::addTrade,
+                onRemoveTrade = viewModel::removeTrade,
             )
         }
         if (alertSheet && quote != null) {
@@ -215,6 +219,9 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 onSelect = { selected = it },
                 height = chartHeight,
                 compare = overlay,
+                marks = trades.filter { it.symbol == symbol || it.symbol == local?.symbol }.map { t ->
+                    java.time.LocalDate.parse(t.date).atTime(12, 0).atZone(java.time.ZoneId.of("America/New_York")).toEpochSecond() to t.buy
+                },
                 timestamps = chart?.timestamps.orEmpty(),
                 range = range,
                 before = before,
@@ -342,6 +349,7 @@ private fun ChartBlock(
     onSelect: (Int?) -> Unit,
     height: Dp,
     compare: List<Double>? = null,
+    marks: List<Pair<Long, Boolean>> = emptyList(),
     timestamps: List<Long> = emptyList(),
     range: ChartRange = ChartRange.DAY,
     before: ExtSegment? = null,
@@ -362,6 +370,7 @@ private fun ChartBlock(
                 },
                 modifier = Modifier.fillMaxSize(),
                 compare = compare,
+                marks = marks,
                 timestamps = timestamps,
                 range = range,
                 before = before,

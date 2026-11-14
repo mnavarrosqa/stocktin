@@ -18,6 +18,7 @@ import app.stocktin.data.Quote
 import app.stocktin.data.STRIP_SYMBOLS
 import app.stocktin.data.NewsItem
 import app.stocktin.data.SortMode
+import app.stocktin.data.Trade
 import app.stocktin.data.SuggestedList
 import app.stocktin.data.Repository
 import app.stocktin.data.SearchResult
@@ -92,6 +93,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val econ = repository.econ
     val notes = repository.notes
     val history = repository.history
+    val trades = repository.trades
+
+    fun addTrade(symbol: String, date: String, shares: Double, price: Double, buy: Boolean) {
+        repository.addTrade(Trade(java.util.UUID.randomUUID().toString().take(8), symbol, date, shares, price, buy))
+        ensureQuotes(listOf(symbol))
+        widgetsChanged()
+    }
+
+    fun removeTrade(trade: Trade) {
+        repository.removeTrade(trade)
+        widgetsChanged()
+        _message.value = Message("Operación borrada", "Deshacer") { repository.addTrade(trade) }
+    }
 
     fun setNote(symbol: String, text: String) = repository.setNote(symbol, text)
 
@@ -613,6 +627,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleHideBalance() {
         settings.hideBalance = !_hideBalance.value
         _hideBalance.value = settings.hideBalance
+        widgetsChanged()
     }
 
     /** Avisa si se corrigió algún precio promedio en pesos que se había leído mal. */

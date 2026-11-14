@@ -13,8 +13,10 @@ import androidx.glance.GlanceTheme
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.stocktin.data.Holding
 import app.stocktin.data.Quote
 import app.stocktin.data.YahooParser
+import app.stocktin.widget.PortfolioWidget
 import app.stocktin.widget.TickerWidget
 import app.stocktin.widget.WatchlistWidget
 import app.stocktin.widget.WidgetLayout
@@ -147,6 +149,19 @@ class WidgetScreenshotTest {
     @Test fun ticker4x1() = render("11_simbolo_4x1", 340.dp, 90.dp) { TickerWidgetOf("BTC-USD") }
 
     @Test fun ticker2x2() = render("12_simbolo_2x2", 160.dp, 180.dp) { TickerWidgetOf("AAPL") }
+
+    private val holdings = listOf(Holding("NVDA", 12.0, 160.0), Holding("AAPL", 5.0, 245.0), Holding("MELI", 1.0, 1900.0))
+
+    @Composable
+    private fun PortfolioWidgetOf(hidden: Boolean = false) {
+        PortfolioWidget().Content(holdings, rows.toMap(), WidgetPalette.of(WidgetTheme.DYNAMIC), hidden)
+    }
+
+    @Test fun portfolio2x1() = render("14_cartera_2x1", 160.dp, 90.dp) { PortfolioWidgetOf() }
+
+    @Test fun portfolio4x2() = render("15_cartera_4x2", 340.dp, 200.dp) { PortfolioWidgetOf() }
+
+    @Test fun portfolioHidden() = render("16_cartera_oculta", 250.dp, 120.dp) { PortfolioWidgetOf(hidden = true) }
 
     @Test fun ticker2x2Dark() = render("13_simbolo_2x2_oscuro", 160.dp, 180.dp) { TickerWidgetOf("NVDA", WidgetTheme.DARK) }
 }

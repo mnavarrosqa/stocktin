@@ -24,6 +24,7 @@ class Repository private constructor(private val context: Context) {
     private val calendarFile = File(context.filesDir, "calendar.json")
     private val notesFile = File(context.filesDir, "notes.json")
     private val historyFile = File(context.filesDir, "history.json")
+    private val tradesFile = File(context.filesDir, "trades.json")
     private val settings = Settings(context)
     private val refreshLock = Mutex()
 
@@ -48,6 +49,10 @@ class Repository private constructor(private val context: Context) {
     private val _history = MutableStateFlow(runCatching { PortfolioHistory.fromJson(historyFile.readText()) }.getOrDefault(emptyMap()))
     /** Lo que valía la cartera cada día, por moneda. */
     val history: StateFlow<Map<String, Map<String, Double>>> = _history.asStateFlow()
+
+    private val _trades = MutableStateFlow(runCatching { Trades.fromJson(tradesFile.readText()) }.getOrDefault(emptyList()))
+    /** Tus compras y ventas (si las cargaste una por una). */
+    val trades: StateFlow<List<Trade>> = _trades.asStateFlow()
 
     private val _economy = MutableStateFlow(loadCalendar())
     /** La agenda económica de EE.UU. (Fed, inflación, empleo, PBI). */
@@ -266,6 +271,22 @@ class Repository private constructor(private val context: Context) {
         o.keys().asSequence().associateWith { o.getString(it) }
     }.getOrDefault(emptyMap())
 
+    /** Suma una compra o venta y recalcula la posición de ese símbolo. */
+    fun addTrade(trade: Trade) = editTrades(trade.symbol) { it + trade }
+
+    fun removeTrade(trade: Trade) = editTrades(trade.symbol) { list -> list.filterNot { it.id == trade.id } }
+
+    /** Con operaciones cargadas, la posición sale de ellas (cantidad y precio promedio). */
+    @Synchronized
+    private fun editTrades(symbol: String, change: (List<Trade>) -> List<Trade>) {
+        val updated = change(_trades.value)
+        _trades.value = updated
+        writeAtomically(tradesFile, Trades.toJson(updated))
+        if (updated.none { it.symbol == symbol }) return
+        val holding = Trades.summarize(symbol, updated).holding
+        editHoldings { holdings -> if (holding == null) holdings - symbol else holdings + (symbol to holding) }
+    }
+
     /** Anota lo que vale hoy la cartera (después de cada actualización). */
     @Synchronized
     fun recordHistory() {
@@ -279,7 +300,7 @@ class Repository private constructor(private val context: Context) {
 
     /** La copia de seguridad de todo lo que cargaste. */
     fun exportBackup(): String = Backup.toJson(
-        BackupData(_lists.value, _holdings.value.values.toList(), _alerts.value, _notes.value),
+        BackupData(_lists.value, _holdings.value.values.toList(), _alerts.value, _notes.value, _trades.value, _history.value),
         exportedAt = java.time.OffsetDateTime.now().toString(),
     )
 
@@ -292,6 +313,12 @@ class Repository private constructor(private val context: Context) {
         synchronized(this) {
             _notes.value = data.notes
             writeAtomically(notesFile, JSONObject(data.notes).toString())
+            _trades.value = data.trades
+            writeAtomically(tradesFile, Trades.toJson(data.trades))
+            if (data.history.isNotEmpty()) {
+                _history.value = data.history
+                writeAtomically(historyFile, PortfolioHistory.toJson(data.history))
+            }
         }
         return data
     }

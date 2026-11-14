@@ -60,6 +60,8 @@ fun PriceChart(
     /** En 1D, la pre-apertura (a la izquierda) y el post-cierre (a la derecha), en una línea aparte. */
     before: ExtSegment? = null,
     after: ExtSegment? = null,
+    /** Tus compras (true) y ventas (false): segundos desde 1970. Se marcan en el día más cercano. */
+    marks: List<Pair<Long, Boolean>> = emptyList(),
 ) {
     val dash = MaterialColors.outline()
     val grid = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
@@ -205,6 +207,24 @@ fun PriceChart(
                 for (i in 1 until extra.size) lineTo(x(i), y(extra[i]))
             }
             drawPath(other, compareColor, style = Stroke(width = stroke * 0.75f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        // Tus compras (triángulo verde abajo de la línea) y ventas (rojo, arriba), si caen en el rango.
+        if (timestamps.size == prices.size && range != ChartRange.DAY) {
+            marks.filter { (t, _) -> t >= timestamps.first() - 86_400 && t <= timestamps.last() + 86_400 }.forEach { (t, buy) ->
+                val i = timestamps.indices.minBy { kotlin.math.abs(timestamps[it] - t) }
+                val mx = x(i)
+                val my = y(prices[i])
+                val r = 5.dp.toPx()
+                val gap = 7.dp.toPx()
+                val path = Path().apply {
+                    if (buy) {
+                        moveTo(mx, my + gap); lineTo(mx - r, my + gap + r * 1.6f); lineTo(mx + r, my + gap + r * 1.6f); close()
+                    } else {
+                        moveTo(mx, my - gap); lineTo(mx - r, my - gap - r * 1.6f); lineTo(mx + r, my - gap - r * 1.6f); close()
+                    }
+                }
+                drawPath(path, if (buy) Up else Down)
+            }
         }
         // El último precio: un punto con un halo.
         if (selected == null) {

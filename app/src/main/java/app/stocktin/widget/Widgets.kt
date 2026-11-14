@@ -33,6 +33,7 @@ object Widgets {
         runCatching {
             WatchlistWidget().updateAll(context)
             TickerWidget().updateAll(context)
+            PortfolioWidget().updateAll(context)
         }
     }
 

@@ -96,6 +96,13 @@ búsqueda al lado.
   venderías.
 - **Copia de seguridad:** Ajustes → Tus datos → "Guardar una copia" baja un archivo con tus listas,
   cartera, alertas y notas; "Recuperar una copia" lo vuelve a cargar (por ejemplo, en otro teléfono).
+- **Cartera día a día:** tocando "Tu cartera" se ve un gráfico de cuánto valía cada día (1M, 3M,
+  1A o todo); se arma con lo que la app anota en cada actualización.
+- **Dólar:** en Mercados, el oficial, el CCL (calculado con Galicia, YPF, Pampa y Macro) y la brecha.
+  Con pesos y dólares en la cartera, se ve también el total junto, con los pesos al CCL.
+- **Widget de cartera:** total, cambio de hoy, ganancia y las posiciones más grandes; respeta el ojito.
+- **Compras y ventas:** en "Tu posición", cargá cada operación con su fecha; el promedio y la ganancia
+  realizada se calculan solos, y en el gráfico se marcan las compras (▲) y las ventas (▼).
 - **Compartir la app:** Ajustes → Acerca de → Compartir Stocktin manda el link de descarga.
 - El detalle trae las últimas **noticias** del símbolo y marca el máximo y el mínimo en el gráfico.
 - Con la app abierta los precios se actualizan cada 30 segundos.

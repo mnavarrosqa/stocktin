@@ -13,6 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -72,6 +78,8 @@ import app.stocktin.data.Portfolio
 import app.stocktin.data.PortfolioTotal
 import app.stocktin.data.Position
 import app.stocktin.data.Quote
+import app.stocktin.data.Trades
+import app.stocktin.data.Trade
 import java.util.Locale
 
 /** "USD 1,234.56" (sin moneda si Yahoo no la dice). */
@@ -504,8 +512,12 @@ fun HoldingSheet(
     onSave: (symbol: String, shares: Double, cost: Double) -> Unit,
     onRemove: (symbol: String) -> Unit,
     onDismiss: () -> Unit,
+    trades: List<Trade> = emptyList(),
+    onAddTrade: (symbol: String, date: String, shares: Double, price: Double, buy: Boolean) -> Unit = { _, _, _, _, _ -> },
+    onRemoveTrade: (Trade) -> Unit = {},
 ) {
     var selected by remember { mutableStateOf(initial.coerceIn(0, targets.lastIndex)) }
+    var tradeDialog by remember { mutableStateOf<Boolean?>(null) }
     val target = targets.getOrElse(selected) { targets.first() }
     var sharesText by remember(selected) { mutableStateOf(target.holding?.shares?.let(::shares).orEmpty()) }
     var costText by remember(selected, target.price != null) {
@@ -517,7 +529,7 @@ fun HoldingSheet(
     val cost = Alerts.parsePrice(costText, pesos = local)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
-            Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp).navigationBarsPadding(),
+            Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 16.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text("Tu posición en $title", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -542,6 +554,8 @@ fun HoldingSheet(
                     )
                 }
             }
+            val targetTrades = trades.filter { it.symbol == target.symbol }.sortedByDescending { it.date }
+            if (targetTrades.isEmpty()) {
             OutlinedTextField(
                 value = sharesText,
                 onValueChange = { sharesText = it },
@@ -588,7 +602,56 @@ fun HoldingSheet(
                 enabled = shares != null && cost != null,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text("Guardar") }
-            if (target.holding != null) {
+            } else {
+                // Con operaciones cargadas, la cantidad y el promedio salen de ellas.
+                val summary = Trades.summarize(target.symbol, targetTrades)
+                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Según tus operaciones", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            summary.holding?.let { "${shares(it.shares)} a ${Format.price(it.cost, target.currency)} de promedio" } ?: "Vendiste todo",
+                            style = MaterialTheme.typography.titleMedium.tabular(),
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        if (abs(summary.realized) > 0.005) {
+                            Text(
+                                "Ganancia realizada (lo que ya vendiste): ${Format.change(summary.realized, target.currency)}",
+                                style = MaterialTheme.typography.bodySmall.tabular(),
+                                color = changeColor(summary.realized),
+                            )
+                        }
+                    }
+                }
+            }
+            // Compras y ventas una por una: así el promedio se calcula solo.
+            Text("Compras y ventas", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            targetTrades.forEach { trade ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (trade.buy) "Compra" else "Venta",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (trade.buy) Up else Down,
+                        modifier = Modifier.width(64.dp),
+                    )
+                    Column(Modifier.weight(1f)) {
+                        Text("${shares(trade.shares)} × ${Format.price(trade.price, target.currency)}", style = MaterialTheme.typography.bodyMedium.tabular())
+                        Text(tradeDate(trade.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = { onRemoveTrade(trade) }) { Icon(Icons.Filled.Close, "Borrar operación") }
+                }
+            }
+            if (targetTrades.isEmpty()) {
+                Text(
+                    "Si cargás cada compra y venta con su fecha, el precio promedio se calcula solo y se marcan en el gráfico.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { tradeDialog = true }, modifier = Modifier.weight(1f)) { Text("+ Compra") }
+                OutlinedButton(onClick = { tradeDialog = false }, modifier = Modifier.weight(1f)) { Text("+ Venta") }
+            }
+            if (target.holding != null && targetTrades.isEmpty()) {
                 TextButton(
                     onClick = {
                         onRemove(target.symbol)
@@ -603,6 +666,81 @@ fun HoldingSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+    tradeDialog?.let { buy ->
+        TradeDialog(
+            buy = buy,
+            local = local,
+            price = target.price,
+            onSave = { date, q, p -> onAddTrade(target.symbol, date, q, p, buy) },
+            onDismiss = { tradeDialog = null },
+        )
+    }
+}
+
+private fun tradeDate(date: String): String = runCatching {
+    java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM yyyy", java.util.Locale.forLanguageTag("es-AR")).format(java.time.LocalDate.parse(date))
+}.getOrDefault(date)
+
+/** Cargar una compra o una venta: el día, cuántas y a qué precio. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TradeDialog(buy: Boolean, local: Boolean, price: Double?, onSave: (date: String, shares: Double, price: Double) -> Unit, onDismiss: () -> Unit) {
+    var date by remember { mutableStateOf(java.time.LocalDate.now()) }
+    var picking by remember { mutableStateOf(false) }
+    var sharesText by remember { mutableStateOf("") }
+    var priceText by remember { mutableStateOf(price?.let { if (local) Format.pesos(it) else plainPrice(it) }.orEmpty()) }
+    val shares = Alerts.parsePrice(sharesText, pesos = local)
+    val unit = Alerts.parsePrice(priceText, pesos = local)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (buy) "Nueva compra" else "Nueva venta") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = { picking = true }, modifier = Modifier.fillMaxWidth()) { Text("Fecha: " + tradeDate(date.toString())) }
+                OutlinedTextField(
+                    value = sharesText,
+                    onValueChange = { sharesText = it },
+                    label = { Text("Cantidad") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { priceText = it },
+                    label = { Text(if (local) "Precio (en pesos)" else "Precio") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (shares != null && unit != null) onSave(date.toString(), shares, unit)
+                    onDismiss()
+                },
+                enabled = shares != null && unit != null,
+            ) { Text("Guardar") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+    if (picking) {
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { picking = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { date = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate() }
+                    picking = false
+                }) { Text("Listo") }
+            },
+            dismissButton = { TextButton(onClick = { picking = false }) { Text("Cancelar") } },
+        ) { DatePicker(state = state) }
     }
 }
 

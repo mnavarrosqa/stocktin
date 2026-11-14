@@ -4,5 +4,7 @@
     <string name="watchlist_widget_name">Lista de cotizaciones</string>
     <string name="watchlist_widget_description">Tus acciones, índices y cripto con precio, cambio y gráfico del día</string>
     <string name="ticker_widget_name">Un símbolo</string>
+    <string name="portfolio_widget_name">Tu cartera</string>
+    <string name="portfolio_widget_description">Cuánto vale tu cartera, cuánto cambió hoy y cuánto ganaste</string>
     <string name="ticker_widget_description">Precio grande, cambio y gráfico del día de un símbolo</string>
 </resources>
