@@ -23,6 +23,7 @@ class Repository private constructor(private val context: Context) {
     private val holdingsFile = File(context.filesDir, "holdings.json")
     private val calendarFile = File(context.filesDir, "calendar.json")
     private val notesFile = File(context.filesDir, "notes.json")
+    private val historyFile = File(context.filesDir, "history.json")
     private val settings = Settings(context)
     private val refreshLock = Mutex()
 
@@ -43,6 +44,10 @@ class Repository private constructor(private val context: Context) {
     private val _notes = MutableStateFlow(loadNotes())
     /** Tus notas por símbolo (por qué la compraste, a cuánto venderías…). */
     val notes: StateFlow<Map<String, String>> = _notes.asStateFlow()
+
+    private val _history = MutableStateFlow(runCatching { PortfolioHistory.fromJson(historyFile.readText()) }.getOrDefault(emptyMap()))
+    /** Lo que valía la cartera cada día, por moneda. */
+    val history: StateFlow<Map<String, Map<String, Double>>> = _history.asStateFlow()
 
     private val _economy = MutableStateFlow(loadCalendar())
     /** La agenda económica de EE.UU. (Fed, inflación, empleo, PBI). */
@@ -260,6 +265,17 @@ class Repository private constructor(private val context: Context) {
         val o = JSONObject(notesFile.readText())
         o.keys().asSequence().associateWith { o.getString(it) }
     }.getOrDefault(emptyMap())
+
+    /** Anota lo que vale hoy la cartera (después de cada actualización). */
+    @Synchronized
+    fun recordHistory() {
+        val totals = Portfolio.totals(_holdings.value.values, _quotes.value)
+        val values = totals.mapNotNull { t -> t.currency?.let { it to t.position.value } }.toMap()
+        if (values.isEmpty()) return
+        val updated = PortfolioHistory.record(_history.value, java.time.LocalDate.now().toString(), values)
+        _history.value = updated
+        writeAtomically(historyFile, PortfolioHistory.toJson(updated))
+    }
 
     /** La copia de seguridad de todo lo que cargaste. */
     fun exportBackup(): String = Backup.toJson(

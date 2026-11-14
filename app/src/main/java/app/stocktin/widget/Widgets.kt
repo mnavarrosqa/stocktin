@@ -21,6 +21,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import app.stocktin.alerts.AgendaNotifier
 import app.stocktin.alerts.AlertNotifier
+import app.stocktin.data.Dollar
 import app.stocktin.data.MarketHours
 import app.stocktin.data.Repository
 import app.stocktin.data.Settings
@@ -44,7 +45,9 @@ object Widgets {
             }
         }.getOrDefault(emptyList())
         val repository = Repository.get(context)
-        return (repository.allSymbols() + tickers + repository.alerts.value.map { it.symbol } + repository.holdings.value.keys).distinct()
+        // Con algo en pesos, también lo que hace falta para el dólar CCL (el total en una sola moneda).
+        val dollar = if (repository.holdings.value.keys.any { it.endsWith(".BA") }) Dollar.SYMBOLS else emptyList()
+        return (repository.allSymbols() + tickers + repository.alerts.value.map { it.symbol } + repository.holdings.value.keys + dollar).distinct()
     }
 
     /** Trae cotizaciones nuevas (más [extra], si se pide), avisa las alertas cumplidas y redibuja los widgets. */
@@ -53,6 +56,7 @@ object Widgets {
         val result = repository.refresh((symbolsInUse(context) + extra).distinct())
         // Sin permiso de notificaciones las alertas no se consumen: si no, se cumplían y se borraban
         // sin que nadie se enterara.
+        if (result.isSuccess) repository.recordHistory()
         if (result.isSuccess && AlertNotifier.canNotify(context)) AlertNotifier.notify(context, repository.takeReachedAlerts())
         repository.refreshCalendar()
         AgendaNotifier.notifyToday(context)

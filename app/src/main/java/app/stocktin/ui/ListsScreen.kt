@@ -92,6 +92,7 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
     val showValue by viewModel.showValue.collectAsState()
     val sortMode by viewModel.sortMode.collectAsState()
     val holdings by viewModel.holdings.collectAsState()
+    val history by viewModel.history.collectAsState()
     var portfolioSheet by remember { mutableStateOf(false) }
     var openedSuggestion by remember { mutableStateOf<SuggestedList?>(null) }
     val list = lists.firstOrNull { it.id == currentId } ?: lists.first()
@@ -353,6 +354,7 @@ fun ListsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPadding
                 viewModel.open(Screen.Detail(it))
             },
             onDismiss = { portfolioSheet = false },
+            history = history,
         )
     }
 

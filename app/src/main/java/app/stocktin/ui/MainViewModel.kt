@@ -8,6 +8,7 @@ import app.stocktin.data.Backup
 import app.stocktin.data.AgendaInfo
 import app.stocktin.data.Alert
 import app.stocktin.data.Chart
+import app.stocktin.data.Dollar
 import app.stocktin.data.Format
 import app.stocktin.data.ChartCompare
 import app.stocktin.data.ChartRange
@@ -90,6 +91,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val holdings = repository.holdings
     val econ = repository.econ
     val notes = repository.notes
+    val history = repository.history
 
     fun setNote(symbol: String, text: String) = repository.setNote(symbol, text)
 
@@ -304,7 +306,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refreshMarkets() {
-        viewModelScope.launch { repository.refresh(MARKET_SYMBOLS) }
+        viewModelScope.launch { repository.refresh((MARKET_SYMBOLS + Dollar.SYMBOLS).distinct()) }
         loadMovers(_moversKind.value)
     }
 
@@ -328,7 +330,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _tab.value = tab
         _stack.value = emptyList()
         if (tab == Tab.MARKETS) viewModelScope.launch { repository.refreshEcon() }
-        if (tab == Tab.MARKETS && (MARKET_SYMBOLS.any { repository.quotes.value[it] == null } || _movers.value.isEmpty())) {
+        if (tab == Tab.MARKETS && ((MARKET_SYMBOLS + Dollar.SYMBOLS).any { repository.quotes.value[it] == null } || _movers.value.isEmpty())) {
             refreshMarkets()
         }
     }

@@ -54,6 +54,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.data.Agenda
+import app.stocktin.data.Dollar
+import app.stocktin.data.DollarRates
 import app.stocktin.data.AgendaEvent
 import app.stocktin.data.AgendaInfo
 import app.stocktin.data.Format
@@ -105,7 +107,7 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
     val scope = rememberCoroutineScope()
 
     // Dónde empieza cada sección en la grilla, para que los chips salten hasta ahí.
-    val headerItems = 4 // estado, agenda, chips y destacados
+    val headerItems = 5 // estado, dólar, agenda, chips y destacados
     val sectionStart = buildList {
         var index = headerItems
         MARKET_SECTIONS.forEach { section ->
@@ -132,6 +134,9 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
                 ) {
                     item(key = "status", span = { GridItemSpan(maxLineSpan) }) {
                         MarketStatus(now, quotes["^GSPC"])
+                    }
+                    item(key = "dollar", span = { GridItemSpan(maxLineSpan) }) {
+                        DollarCard(Dollar.rates(quotes)) { viewModel.open(Screen.Detail(Dollar.OFFICIAL)) }
                     }
                     item(key = "agenda", span = { GridItemSpan(maxLineSpan) }) {
                         // Lo más cercano; el resto del mes, en "Ver todo".
@@ -197,6 +202,42 @@ fun MarketsScreen(viewModel: MainViewModel, selectedSymbol: String?, bottomPaddi
                     viewModel.open(Screen.Detail(it))
                 },
                 onDismiss = { openedEvent = null },
+            )
+        }
+    }
+}
+
+/** El dólar oficial, el CCL que surge de las acciones y la brecha entre los dos. */
+@Composable
+private fun DollarCard(rates: DollarRates, onOpenOfficial: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth().padding(4.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Dólar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Row {
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable(onClick = onOpenOfficial)) {
+                    Text("Oficial", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(rates.official?.let { "$ " + Format.pesos(it) } ?: "—", style = MaterialTheme.typography.titleLarge.tabular(), fontWeight = FontWeight.Bold)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("CCL", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(rates.ccl?.let { "$ " + Format.pesos(it) } ?: "—", style = MaterialTheme.typography.titleLarge.tabular(), fontWeight = FontWeight.Bold)
+                    rates.cclChangePercent?.let {
+                        Text(Format.percent(it) + " hoy", style = MaterialTheme.typography.labelMedium.tabular(), color = changeColor(it))
+                    }
+                }
+                Column(Modifier.weight(0.8f)) {
+                    Text("Brecha", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(rates.gap?.let { String.format(java.util.Locale.US, "%.1f%%", it) } ?: "—", style = MaterialTheme.typography.titleLarge.tabular(), fontWeight = FontWeight.Bold)
+                }
+            }
+            Text(
+                "El CCL sale de comparar acciones que cotizan acá en pesos y en Nueva York en dólares (Galicia, YPF, Pampa y Macro).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

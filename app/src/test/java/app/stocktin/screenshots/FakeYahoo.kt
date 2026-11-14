@@ -24,6 +24,16 @@ object FakeYahoo {
         "^VIX" to Fake("CBOE Volatility Index", 17.88, -2.77, "INDEX"),
         "MELI" to Fake("MercadoLibre, Inc.", 2310.40, 1.84),
         "TSLA" to Fake("Tesla, Inc.", 452.10, -1.31),
+        // Para el dólar CCL: acción local, ADR y oficial, con precios que dan un CCL razonable.
+        "ARS=X" to Fake("USD/ARS", 1452.50, 0.12, "CURRENCY"),
+        "GGAL.BA" to Fake("Grupo Financiero Galicia", 7350.0, 1.2),
+        "GGAL" to Fake("Grupo Financiero Galicia ADR", 48.10, 0.9),
+        "YPFD.BA" to Fake("YPF", 52400.0, 0.8),
+        "YPF" to Fake("YPF ADR", 34.20, 0.6),
+        "PAMP.BA" to Fake("Pampa Energía", 3120.0, -0.4),
+        "PAM" to Fake("Pampa Energía ADR", 51.30, -0.5),
+        "BMA.BA" to Fake("Banco Macro", 11200.0, 1.5),
+        "BMA" to Fake("Banco Macro ADR", 73.40, 1.1),
     )
 
     private fun fake(symbol: String): Fake = known[symbol] ?: run {

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -62,6 +63,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.stocktin.R
 import app.stocktin.data.Alerts
+import app.stocktin.data.Dollar
+import app.stocktin.data.PortfolioHistory
+import app.stocktin.data.ChartRange
 import app.stocktin.data.Format
 import app.stocktin.data.Holding
 import app.stocktin.data.Portfolio
@@ -209,6 +213,16 @@ fun PortfolioCard(holdings: Collection<Holding>, quotes: Map<String, Quote>, onT
                     }
                 }
                 AllocationBar(Portfolio.allocation(holdings, quotes, main.currency))
+                // Pesos y dólares juntos, pasando los pesos al dólar CCL.
+                val ccl = Dollar.rates(quotes).ccl
+                val usd = totals.firstOrNull { it.currency == "USD" }?.position?.value
+                val ars = totals.firstOrNull { it.currency == "ARS" }?.position?.value
+                if (ccl != null && usd != null && ars != null) {
+                    Text(
+                        "Todo junto ≈ ${shownMoney(usd + ars / ccl, "USD")} (los pesos, al CCL)",
+                        style = MaterialTheme.typography.labelLarge.tabular(),
+                    )
+                }
                 totals.drop(1).forEach { other ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(shownMoney(other.position.value, other.currency), style = MaterialTheme.typography.titleSmall.tabular(), fontWeight = FontWeight.SemiBold)
@@ -228,7 +242,13 @@ fun PortfolioCard(holdings: Collection<Holding>, quotes: Map<String, Quote>, onT
 /** La cartera completa: cada posición con su valor y su ganancia; tocar una abre el detalle. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PortfolioSheet(holdings: Collection<Holding>, quotes: Map<String, Quote>, onOpen: (String) -> Unit, onDismiss: () -> Unit) {
+fun PortfolioSheet(
+    holdings: Collection<Holding>,
+    quotes: Map<String, Quote>,
+    onOpen: (String) -> Unit,
+    onDismiss: () -> Unit,
+    history: Map<String, Map<String, Double>> = emptyMap(),
+) {
     val totals = Portfolio.totals(holdings, quotes)
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 16.dp)) {
@@ -238,6 +258,7 @@ fun PortfolioSheet(holdings: Collection<Holding>, quotes: Map<String, Quote>, on
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
+            totals.firstOrNull()?.currency?.let { HistoryChart(history, it) }
             totals.forEach { total ->
                 val p = total.position
                 Row(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalAlignment = Alignment.Bottom) {
@@ -276,6 +297,61 @@ fun PortfolioSheet(holdings: Collection<Holding>, quotes: Map<String, Quote>, on
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
             )
+        }
+    }
+}
+
+/** Los rangos del gráfico de la cartera: etiqueta y cuántos días atrás (null = todo). */
+private val HISTORY_RANGES = listOf("1M" to 31L, "3M" to 92L, "1A" to 366L, "Todo" to null)
+
+/** Cómo vino tu cartera día a día (se arma con lo que guarda la app en cada actualización). */
+@Composable
+private fun HistoryChart(history: Map<String, Map<String, Double>>, currency: String) {
+    var range by remember { mutableStateOf(HISTORY_RANGES.last()) }
+    var selected by remember(range) { mutableStateOf<Int?>(null) }
+    val from = range.second?.let { java.time.LocalDate.now().minusDays(it).toString() }.orEmpty()
+    val series = PortfolioHistory.series(history, currency, from)
+    Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (series.size < 2) {
+            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "El gráfico de tu cartera se va armando día a día: desde hoy la app anota cuánto vale cada vez que actualiza.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(14.dp),
+                )
+            }
+            return@Column
+        }
+        val values = series.map { it.second }
+        val shownIndex = selected ?: values.lastIndex
+        val change = values[shownIndex] - values.first()
+        val percent = if (values.first() > 0) change / values.first() * 100 else 0.0
+        val day = java.time.LocalDate.parse(series[shownIndex].first)
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(shownMoney(values[shownIndex], currency), style = MaterialTheme.typography.titleLarge.tabular(), fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(10.dp))
+            GainText(change, percent, MaterialTheme.typography.labelLarge, currency)
+        }
+        Text(
+            java.time.format.DateTimeFormatter.ofPattern("EEEE d 'de' MMMM yyyy", java.util.Locale.forLanguageTag("es-AR")).format(day),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        PriceChart(
+            prices = values,
+            baseline = values.first(),
+            color = changeColor(change),
+            selected = selected,
+            onSelect = { selected = it },
+            timestamps = series.map { java.time.LocalDate.parse(it.first).atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toEpochSecond() },
+            range = if ((range.second ?: 400L) <= 31L) ChartRange.MONTH else ChartRange.YEAR,
+            modifier = Modifier.fillMaxWidth().height(180.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            HISTORY_RANGES.forEach { r ->
+                FilterChip(selected = r == range, onClick = { range = r }, label = { Text(r.first) })
+            }
         }
     }
 }
