@@ -30,6 +30,9 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -108,6 +111,25 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
     val alerts by viewModel.alerts.collectAsState()
     val agendaNotifications by viewModel.agendaNotifications.collectAsState()
     val appLock by viewModel.appLock.collectAsState()
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let(viewModel::exportBackup)
+    }
+    var pendingImport by remember { mutableStateOf<android.net.Uri?>(null) }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> pendingImport = uri }
+    pendingImport?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { pendingImport = null },
+            title = { Text("¿Recuperar la copia?") },
+            text = { Text("Se reemplazan tus listas, tu cartera, tus alertas y tus notas por las de la copia.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.importBackup(uri)
+                    pendingImport = null
+                }) { Text("Recuperar") }
+            },
+            dismissButton = { TextButton(onClick = { pendingImport = null }) { Text("Cancelar") } },
+        )
+    }
     val quotes by viewModel.quotes.collectAsState()
     val context = LocalContext.current
 
@@ -273,6 +295,22 @@ fun SettingsScreen(viewModel: MainViewModel, onUpdate: () -> Unit, bottomPadding
                     summary = "En vez de porcentaje. También se cambia tocando la etiqueta de color.",
                     checked = showValue,
                     onChange = viewModel::setShowValue,
+                )
+            }
+
+            Section("Tus datos") {
+                LinkRow(Icons.Filled.Share, "Guardar una copia", "Listas, cartera, alertas y notas, en un archivo") {
+                    exportLauncher.launch("stocktin-copia-${java.time.LocalDate.now()}.json")
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                LinkRow(Icons.Filled.Refresh, "Recuperar una copia", "Por ejemplo, al cambiar de teléfono") {
+                    importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream"))
+                }
+                Text(
+                    "Todo lo que cargás queda solo en este teléfono. Guardá una copia de vez en cuando (en Drive o mandándotela) para no perderlo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
                 )
             }
 

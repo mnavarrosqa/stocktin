@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.stocktin.data.AgendaEvent
+import app.stocktin.data.Backup
 import app.stocktin.data.AgendaInfo
 import app.stocktin.data.Alert
 import app.stocktin.data.Chart
@@ -88,6 +89,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val alerts = repository.alerts
     val holdings = repository.holdings
     val econ = repository.econ
+    val notes = repository.notes
+
+    fun setNote(symbol: String, text: String) = repository.setNote(symbol, text)
+
+    /** Escribe la copia de seguridad en el archivo que eligió el usuario. */
+    fun exportBackup(uri: android.net.Uri) {
+        viewModelScope.launch {
+            runCatching {
+                val text = repository.exportBackup()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray()) }
+                }
+            }.onSuccess { showMessage("Copia guardada. Guardala en Drive o mandátela para no perderla.") }
+                .onFailure { showMessage("No se pudo guardar la copia") }
+        }
+    }
+
+    /** Lee una copia de seguridad y reemplaza listas, cartera, alertas y notas. */
+    fun importBackup(uri: android.net.Uri) {
+        viewModelScope.launch {
+            runCatching {
+                val text = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() }
+                }
+                repository.importBackup(text)
+            }.onSuccess { data ->
+                selectList(repository.lists.value.first().id)
+                widgetsChanged()
+                refresh(quiet = true)
+                showMessage("Listo: recuperamos ${Backup.summary(data)}")
+            }.onFailure { showMessage(it.message ?: "No se pudo leer la copia") }
+        }
+    }
     val econLoading = repository.econLoading
 
     fun retryEcon() {

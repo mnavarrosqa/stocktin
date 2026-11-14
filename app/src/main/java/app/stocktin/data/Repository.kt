@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 
@@ -21,6 +22,7 @@ class Repository private constructor(private val context: Context) {
     private val alertsFile = File(context.filesDir, "alerts.json")
     private val holdingsFile = File(context.filesDir, "holdings.json")
     private val calendarFile = File(context.filesDir, "calendar.json")
+    private val notesFile = File(context.filesDir, "notes.json")
     private val settings = Settings(context)
     private val refreshLock = Mutex()
 
@@ -37,6 +39,10 @@ class Repository private constructor(private val context: Context) {
     private val _holdings = MutableStateFlow(loadHoldings())
     /** La cartera: lo que tenés de cada símbolo. */
     val holdings: StateFlow<Map<String, Holding>> = _holdings.asStateFlow()
+
+    private val _notes = MutableStateFlow(loadNotes())
+    /** Tus notas por símbolo (por qué la compraste, a cuánto venderías…). */
+    val notes: StateFlow<Map<String, String>> = _notes.asStateFlow()
 
     private val _economy = MutableStateFlow(loadCalendar())
     /** La agenda económica de EE.UU. (Fed, inflación, empleo, PBI). */
@@ -241,6 +247,38 @@ class Repository private constructor(private val context: Context) {
         runCatching { Agenda.parse(calendarFile.readText()) }.getOrNull()?.takeIf { it.isNotEmpty() }
             ?: runCatching { Agenda.parse(context.assets.open("calendar.json").bufferedReader().use { it.readText() }) }
                 .getOrDefault(emptyList())
+
+    /** Guarda la nota de [symbol]; vacía, la borra. */
+    @Synchronized
+    fun setNote(symbol: String, text: String) {
+        val updated = if (text.isBlank()) _notes.value - symbol else _notes.value + (symbol to text.trim())
+        _notes.value = updated
+        writeAtomically(notesFile, JSONObject(updated).toString())
+    }
+
+    private fun loadNotes(): Map<String, String> = runCatching {
+        val o = JSONObject(notesFile.readText())
+        o.keys().asSequence().associateWith { o.getString(it) }
+    }.getOrDefault(emptyMap())
+
+    /** La copia de seguridad de todo lo que cargaste. */
+    fun exportBackup(): String = Backup.toJson(
+        BackupData(_lists.value, _holdings.value.values.toList(), _alerts.value, _notes.value),
+        exportedAt = java.time.OffsetDateTime.now().toString(),
+    )
+
+    /** Reemplaza listas, cartera, alertas y notas por las de la copia. Devuelve qué se recuperó. */
+    fun importBackup(text: String): BackupData {
+        val data = Backup.fromJson(text)
+        if (data.lists.isNotEmpty()) editLists { data.lists }
+        editHoldings { data.holdings.associateBy { it.symbol } }
+        editAlerts { data.alerts }
+        synchronized(this) {
+            _notes.value = data.notes
+            writeAtomically(notesFile, JSONObject(data.notes).toString())
+        }
+        return data
+    }
 
     /** Guarda lo que tenés de [symbol]; con 0 unidades lo saca de la cartera. */
     fun setHolding(symbol: String, shares: Double, cost: Double) = editHoldings { holdings ->

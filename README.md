@@ -92,6 +92,10 @@ búsqueda al lado.
 - **Bloqueo con huella:** Ajustes → Seguridad → "Bloquear con huella o PIN". Al abrir la app (o si
   estuvo más de un minuto cerrada) pide la huella, la cara o el bloqueo del teléfono, y la vista
   previa en "Recientes" queda tapada.
+- **Notas por acción:** en el detalle, "Tus notas" para anotar por qué la compraste o a cuánto
+  venderías.
+- **Copia de seguridad:** Ajustes → Tus datos → "Guardar una copia" baja un archivo con tus listas,
+  cartera, alertas y notas; "Recuperar una copia" lo vuelve a cargar (por ejemplo, en otro teléfono).
 - **Compartir la app:** Ajustes → Acerca de → Compartir Stocktin manda el link de descarga.
 - El detalle trae las últimas **noticias** del símbolo y marca el máximo y el mínimo en el gráfico.
 - Con la app abierta los precios se actualizan cada 30 segundos.

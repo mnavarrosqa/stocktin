@@ -34,6 +34,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -100,6 +104,8 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
     val comparing by viewModel.compare.collectAsState()
     val alerts = allAlerts.filter { it.symbol == symbol }
     val holdings by viewModel.holdings.collectAsState()
+    val notes by viewModel.notes.collectAsState()
+    var noteEditor by remember(symbol) { mutableStateOf(false) }
     val holding = holdings[symbol]
     // Qué se está cargando en la hoja de la posición: 0 = acciones, 1 = CEDEARs (null = cerrada).
     var holdingSheet by remember(symbol) { mutableStateOf<Int?>(null) }
@@ -152,6 +158,9 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
             )
         },
     ) { padding ->
+        if (noteEditor) {
+            NoteDialog(symbol, notes[symbol].orEmpty(), onSave = { viewModel.setNote(symbol, it) }, onDismiss = { noteEditor = false })
+        }
         val sheet = holdingSheet
         if (sheet != null && quote != null) {
             val targets = listOfNotNull(
@@ -238,6 +247,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 ) {
                     Stats(quote)
                     PositionCards(viewModel, symbol, quote, local, holdings, quotes) { holdingSheet = it }
+                    NotesBlock(notes[symbol]) { noteEditor = true }
                     AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                     News(viewModel, symbol)
                 }
@@ -252,6 +262,7 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 top(if (inPane) 320.dp else 260.dp)
                 Stats(quote)
                 PositionCards(viewModel, symbol, quote, local, holdings, quotes) { holdingSheet = it }
+                NotesBlock(notes[symbol]) { noteEditor = true }
                 AlertsBlock(alerts, quote, onNew = { alertSheet = true }, onRemove = viewModel::removeAlert)
                 News(viewModel, symbol)
                 Spacer(Modifier.height(24.dp))
@@ -529,6 +540,56 @@ private fun PositionCards(
 
 /** "CEDEARs" queda igual; "Acciones en pesos" pasa a "acciones en pesos" (para el medio de una frase). */
 private fun inSentence(label: String) = if (label.startsWith("CEDEAR")) label else label.lowercase()
+
+/** Tus notas sobre el símbolo: por qué lo compraste, a cuánto venderías… */
+@Composable
+private fun NotesBlock(note: String?, onEdit: () -> Unit) {
+    Surface(
+        onClick = onEdit,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
+            Icon(Icons.Filled.Edit, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Tus notas", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    note ?: "Anotá por qué la compraste, a cuánto venderías o lo que quieras recordar.",
+                    style = if (note != null) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                    color = if (note != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoteDialog(symbol: String, initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Notas de $symbol") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = { Text("Por ejemplo: la compré por el balance; vendo si pasa 250") },
+                minLines = 4,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSave(text)
+                onDismiss()
+            }) { Text("Guardar") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+}
 
 /** Dónde está el precio dentro del rango de 52 semanas. */
 @Composable
