@@ -70,6 +70,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.stocktin.data.Cedears
+import app.stocktin.data.Chart
 import app.stocktin.data.ChartCompare
 import app.stocktin.data.CompanyInfo
 import app.stocktin.data.ChartRange
@@ -104,6 +105,8 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
     var alertSheet by remember(symbol) { mutableStateOf(false) }
     val allAlerts by viewModel.alerts.collectAsState()
     val comparing by viewModel.compare.collectAsState()
+    val candles by viewModel.candles.collectAsState()
+    val averages by viewModel.averages.collectAsState()
     val alerts = allAlerts.filter { it.symbol == symbol }
     val holdings by viewModel.holdings.collectAsState()
     val notes by viewModel.notes.collectAsState()
@@ -224,6 +227,9 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 onSelect = { selected = it },
                 height = chartHeight,
                 compare = overlay,
+                candles = candles,
+                averages = averages,
+                chart = chart,
                 marks = trades.filter { it.symbol == symbol || it.symbol == local?.symbol }.map { t ->
                     java.time.LocalDate.parse(t.date).atTime(12, 0).atZone(java.time.ZoneId.of("America/New_York")).toEpochSecond() to t.buy
                 },
@@ -233,6 +239,23 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
                 after = after,
             )
             RangeSelector(range) { viewModel.setRange(it) }
+            Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = candles, onClick = { viewModel.setCandles(!candles) }, label = { Text("Velas") })
+                FilterChip(selected = averages, onClick = { viewModel.setAverages(!averages) }, label = { Text("Medias 50/200") })
+            }
+            if (averages && prices.size < 50) {
+                Text(
+                    "Para las medias hacen falta más datos: probá con 1A o 5A.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
+            } else if (averages) {
+                Row(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("— Media 50", style = MaterialTheme.typography.labelMedium, color = Color(0xFFE0A100))
+                    if (prices.size >= 200) Text("— Media 200", style = MaterialTheme.typography.labelMedium, color = Color(0xFF7E57C2))
+                }
+            }
             if (benchmark != null && prices.size >= 2 && start != null) {
                 CompareRow(
                     symbol = symbol,
@@ -357,6 +380,9 @@ private fun ChartBlock(
     height: Dp,
     compare: List<Double>? = null,
     marks: List<Pair<Long, Boolean>> = emptyList(),
+    candles: Boolean = false,
+    averages: Boolean = false,
+    chart: Chart? = null,
     timestamps: List<Long> = emptyList(),
     range: ChartRange = ChartRange.DAY,
     before: ExtSegment? = null,
@@ -378,6 +404,12 @@ private fun ChartBlock(
                 modifier = Modifier.fillMaxSize(),
                 compare = compare,
                 marks = marks,
+                candles = candles,
+                opens = chart?.opens.orEmpty(),
+                highs = chart?.highs.orEmpty(),
+                lows = chart?.lows.orEmpty(),
+                volumes = chart?.volumes.orEmpty(),
+                averages = averages,
                 timestamps = timestamps,
                 range = range,
                 before = before,

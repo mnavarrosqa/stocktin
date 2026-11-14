@@ -107,6 +107,8 @@ búsqueda al lado.
   de 200 días.
 - **Datos de la empresa:** P/E, ganancia por acción, dividendo y medias de 50 y 200 días; a qué se
   dedica y los últimos balances (ganancia por acción contra lo esperado).
+- **Velas, volumen y medias:** debajo del gráfico, "Velas" lo muestra en velas japonesas y
+  "Medias 50/200" suma las medias móviles; el volumen va en barras abajo.
 - **Compartir la app:** Ajustes → Acerca de → Compartir Stocktin manda el link de descarga.
 - El detalle trae las últimas **noticias** del símbolo y marca el máximo y el mínimo en el gráfico.
 - Con la app abierta los precios se actualizan cada 30 segundos.

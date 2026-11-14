@@ -560,6 +560,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private val _candles = MutableStateFlow(settings.candles)
+    val candles: StateFlow<Boolean> = _candles.asStateFlow()
+    private val _averages = MutableStateFlow(settings.averages)
+    val averages: StateFlow<Boolean> = _averages.asStateFlow()
+
+    fun setCandles(enabled: Boolean) {
+        settings.candles = enabled
+        _candles.value = enabled
+    }
+
+    fun setAverages(enabled: Boolean) {
+        settings.averages = enabled
+        _averages.value = enabled
+    }
+
     private val _compare = MutableStateFlow(false)
     /** Comparar el gráfico del detalle con su índice (S&P 500 o Merval). */
     val compare: StateFlow<Boolean> = _compare.asStateFlow()

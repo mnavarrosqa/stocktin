@@ -33,17 +33,31 @@ object YahooParser {
             timezone = metaJson.optStringOrNull("exchangeTimezoneName"),
         )
         val times = result.optJSONArray("timestamp") ?: JSONArray()
-        val closes = result.optJSONObject("indicators")
-            ?.optJSONArray("quote")?.optJSONObject(0)
-            ?.optJSONArray("close") ?: JSONArray()
+        val series = result.optJSONObject("indicators")?.optJSONArray("quote")?.optJSONObject(0)
+        val closes = series?.optJSONArray("close") ?: JSONArray()
+        val openArr = series?.optJSONArray("open")
+        val highArr = series?.optJSONArray("high")
+        val lowArr = series?.optJSONArray("low")
+        val volumeArr = series?.optJSONArray("volume")
+        fun at(array: JSONArray?, i: Int): Double? =
+            if (array == null || i >= array.length() || array.isNull(i)) null else array.optDouble(i).takeIf { !it.isNaN() }
         val timestamps = ArrayList<Long>()
         val prices = ArrayList<Double>()
+        val opens = ArrayList<Double>()
+        val highs = ArrayList<Double>()
+        val lows = ArrayList<Double>()
+        val volumes = ArrayList<Long>()
         for (i in 0 until minOf(times.length(), closes.length())) {
             if (closes.isNull(i)) continue
             val price = closes.optDouble(i)
             if (price.isNaN()) continue
             timestamps += times.getLong(i)
             prices += price
+            // Si falta algún dato de la vela, se completa con el cierre.
+            opens += at(openArr, i) ?: price
+            highs += maxOf(at(highArr, i) ?: price, price)
+            lows += minOf(at(lowArr, i) ?: price, price)
+            volumes += at(volumeArr, i)?.toLong() ?: 0L
         }
         return Chart(
             symbol = meta.symbol,
@@ -51,6 +65,10 @@ object YahooParser {
             prices = prices,
             previousClose = metaJson.optDoubleOrNull("chartPreviousClose") ?: meta.previousClose,
             meta = meta,
+            opens = opens,
+            highs = highs,
+            lows = lows,
+            volumes = volumes,
         )
     }
 

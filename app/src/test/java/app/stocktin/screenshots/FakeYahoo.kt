@@ -166,6 +166,24 @@ object FakeYahoo {
         return chartJson(symbol, f, range, previous, first, times, closes)
     }
 
+    /** Velas armadas a partir de los cierres: abre en el cierre anterior y se mueve un poco. */
+    private fun candles(closes: JSONArray): JSONObject {
+        val opens = JSONArray()
+        val highs = JSONArray()
+        val lows = JSONArray()
+        val volumes = JSONArray()
+        for (i in 0 until closes.length()) {
+            val c = closes.getDouble(i)
+            val o = if (i == 0) c else closes.getDouble(i - 1)
+            val wick = c * 0.004 * (1 + (i % 3))
+            opens.put(o)
+            highs.put(maxOf(o, c) + wick)
+            lows.put(minOf(o, c) - wick)
+            volumes.put(1_000_000L + (i * 7919L % 900_000L))
+        }
+        return JSONObject().put("close", closes).put("open", opens).put("high", highs).put("low", lows).put("volume", volumes)
+    }
+
     private fun chartJson(symbol: String, f: Fake, range: String, previous: Double, first: Double, times: JSONArray, closes: JSONArray): String {
         val meta = JSONObject()
             .put("symbol", symbol)
@@ -183,7 +201,7 @@ object FakeYahoo {
         val result = JSONObject()
             .put("meta", meta)
             .put("timestamp", times)
-            .put("indicators", JSONObject().put("quote", JSONArray().put(JSONObject().put("close", closes))))
+            .put("indicators", JSONObject().put("quote", JSONArray().put(candles(closes))))
         return JSONObject().put("chart", JSONObject().put("result", JSONArray().put(result))).toString()
     }
 

@@ -31,3 +31,21 @@ class ChartScaleTest {
         assertTrue(months.zipWithNext().all { (a, b) -> a.first < b.first })
     }
 }
+
+class IndicatorsTest {
+    @Test
+    fun `media movil simple`() {
+        assertEquals(listOf(null, null, 2.0, 3.0, 4.0), ChartScale.sma(listOf(1.0, 2.0, 3.0, 4.0, 5.0), 3))
+    }
+
+    @Test
+    fun `velas y volumen del grafico`() {
+        val body = """{"chart":{"result":[{"meta":{"symbol":"X"},"timestamp":[1,2,3],
+            "indicators":{"quote":[{"close":[10.0,null,12.0],"open":[9.5,null,null],"high":[10.5,null,12.5],"low":[9.0,null,11.0],"volume":[100,null,300]}]}}]}}"""
+        val c = YahooParser.parseChart(body)
+        assertEquals(listOf(10.0, 12.0), c.prices)
+        assertEquals(listOf(9.5, 12.0), c.opens)
+        assertEquals(listOf(10.5, 12.5), c.highs)
+        assertEquals(listOf(100L, 300L), c.volumes)
+    }
+}

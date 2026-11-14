@@ -93,4 +93,14 @@ class Settings(context: Context) {
     var pesosFixed: Boolean
         get() = prefs.getBoolean("pesos_fixed", false)
         set(value) = prefs.edit().putBoolean("pesos_fixed", value).apply()
+
+    /** El gráfico del detalle en velas japonesas. */
+    var candles: Boolean
+        get() = prefs.getBoolean("candles", false)
+        set(value) = prefs.edit().putBoolean("candles", value).apply()
+
+    /** Medias móviles de 50 y 200 en el gráfico del detalle. */
+    var averages: Boolean
+        get() = prefs.getBoolean("averages", false)
+        set(value) = prefs.edit().putBoolean("averages", value).apply()
 }

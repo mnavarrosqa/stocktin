@@ -62,8 +62,23 @@ fun PriceChart(
     after: ExtSegment? = null,
     /** Tus compras (true) y ventas (false): segundos desde 1970. Se marcan en el día más cercano. */
     marks: List<Pair<Long, Boolean>> = emptyList(),
+    /** Velas japonesas en vez de línea (con [opens], [highs] y [lows] alineados con [prices]). */
+    candles: Boolean = false,
+    opens: List<Double> = emptyList(),
+    highs: List<Double> = emptyList(),
+    lows: List<Double> = emptyList(),
+    /** Volumen de cada punto: barras finitas abajo. */
+    volumes: List<Long> = emptyList(),
+    /** Medias móviles de 50 y 200 puntos (cuando hay suficientes). */
+    averages: Boolean = false,
 ) {
     val dash = MaterialColors.outline()
+    val ohlc = candles && opens.size == prices.size && highs.size == prices.size && lows.size == prices.size
+    val showVolume = volumes.size == prices.size && volumes.any { it > 0 }
+    val ma50 = remember(prices, averages) { if (averages && prices.size >= 50) ChartScale.sma(prices, 50) else null }
+    val ma200 = remember(prices, averages) { if (averages && prices.size >= 200) ChartScale.sma(prices, 200) else null }
+    val ma50Color = Color(0xFFE0A100)
+    val ma200Color = Color(0xFF7E57C2)
     val grid = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
     val guide = MaterialColors.onSurfaceVariant()
     val compareColor = guide.copy(alpha = 0.8f)
@@ -78,6 +93,16 @@ fun PriceChart(
     val outside = before?.prices.orEmpty() + after?.prices.orEmpty()
     var low = minOf(prices.minOrNull() ?: 0.0, extra?.minOrNull() ?: Double.MAX_VALUE, base ?: Double.MAX_VALUE, outside.minOrNull() ?: Double.MAX_VALUE)
     var high = maxOf(prices.maxOrNull() ?: 0.0, extra?.maxOrNull() ?: -Double.MAX_VALUE, base ?: -Double.MAX_VALUE, outside.maxOrNull() ?: -Double.MAX_VALUE)
+    if (ohlc) {
+        low = minOf(low, lows.minOrNull() ?: low)
+        high = maxOf(high, highs.maxOrNull() ?: high)
+    }
+    listOfNotNull(ma50, ma200).flatten().filterNotNull().let { values ->
+        if (values.isNotEmpty()) {
+            low = minOf(low, values.min())
+            high = maxOf(high, values.max())
+        }
+    }
     if (high - low < 1e-9) {
         high += 1
         low -= 1
@@ -127,8 +152,25 @@ fun PriceChart(
         val bottomAxis = if (timeLabels.isEmpty()) 0f else (timeLabels.first().second.size.height + 6.dp.toPx())
         val top = 18.dp.toPx()
         val bottom = size.height - bottomAxis - 16.dp.toPx()
+        // Con volumen, la parte de abajo es para sus barras y el precio usa el resto.
+        val volumeHeight = if (showVolume) (bottom - top) * 0.18f else 0f
+        val priceBottom = bottom - volumeHeight - if (showVolume) 6.dp.toPx() else 0f
         fun x(i: Int) = left + (right - left) * i / (prices.size - 1)
-        fun y(v: Double) = (top + (bottom - top) * (1 - (v - low) / (high - low))).toFloat()
+        fun y(v: Double) = (top + (priceBottom - top) * (1 - (v - low) / (high - low))).toFloat()
+        if (showVolume) {
+            val maxVolume = volumes.max().toFloat()
+            val barWidth = ((right - left) / prices.size * 0.7f).coerceAtLeast(1f)
+            volumes.forEachIndexed { i, v ->
+                if (v <= 0) return@forEachIndexed
+                val h = volumeHeight * v / maxVolume
+                val rising = if (i == 0) (opens.getOrNull(0) ?: prices[0]) <= prices[0] else prices[i] >= prices[i - 1]
+                drawRect(
+                    (if (rising) Up else Down).copy(alpha = 0.28f),
+                    topLeft = Offset(x(i) - barWidth / 2, bottom - h),
+                    size = androidx.compose.ui.geometry.Size(barWidth, h),
+                )
+            }
+        }
 
         // Grilla: líneas finas punteadas con el precio a la derecha.
         ticks.forEachIndexed { i, tick ->
@@ -181,21 +223,46 @@ fun PriceChart(
             moveTo(x(0), y(prices[0]))
             for (i in 1 until prices.size) lineTo(x(i), y(prices[i]))
         }
-        val by = base?.let(::y) ?: bottom
-        // El relleno va de la línea hasta la base: arriba verde, abajo rojo, más intenso junto a la línea.
-        val area = Path().apply {
-            addPath(line)
-            lineTo(x(prices.lastIndex), by)
-            lineTo(x(0), by)
-            close()
+        val by = base?.let(::y) ?: priceBottom
+        if (ohlc) {
+            // Velas: la mecha va del mínimo al máximo; el cuerpo, de la apertura al cierre.
+            val bodyWidth = ((right - left) / prices.size * 0.65f).coerceIn(1.5f, 14.dp.toPx())
+            prices.indices.forEach { i ->
+                val rising = prices[i] >= opens[i]
+                val c = if (rising) Up else Down
+                val cx = x(i)
+                drawLine(c, Offset(cx, y(highs[i])), Offset(cx, y(lows[i])), strokeWidth = 1.dp.toPx())
+                val top0 = y(maxOf(opens[i], prices[i]))
+                val bottom0 = y(minOf(opens[i], prices[i]))
+                drawRect(c, topLeft = Offset(cx - bodyWidth / 2, top0), size = androidx.compose.ui.geometry.Size(bodyWidth, maxOf(bottom0 - top0, 1f)))
+            }
+        } else {
+            // El relleno va de la línea hasta la base: arriba verde, abajo rojo, más intenso junto a la línea.
+            val area = Path().apply {
+                addPath(line)
+                lineTo(x(prices.lastIndex), by)
+                lineTo(x(0), by)
+                close()
+            }
+            clipRect(left = left, top = 0f, right = right + stroke, bottom = by) {
+                drawPath(area, Brush.verticalGradient(listOf(up.copy(alpha = 0.30f), up.copy(alpha = 0.03f)), startY = top, endY = by))
+                drawPath(line, up, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+            clipRect(left = left, top = by, right = right + stroke, bottom = priceBottom) {
+                drawPath(area, Brush.verticalGradient(listOf(down.copy(alpha = 0.03f), down.copy(alpha = 0.30f)), startY = by, endY = priceBottom))
+                drawPath(line, down, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
         }
-        clipRect(left = left, top = 0f, right = right + stroke, bottom = by) {
-            drawPath(area, Brush.verticalGradient(listOf(up.copy(alpha = 0.30f), up.copy(alpha = 0.03f)), startY = top, endY = by))
-            drawPath(line, up, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
-        }
-        clipRect(left = left, top = by, right = right + stroke, bottom = size.height) {
-            drawPath(area, Brush.verticalGradient(listOf(down.copy(alpha = 0.03f), down.copy(alpha = 0.30f)), startY = by, endY = bottom))
-            drawPath(line, down, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        // Medias móviles: naranja la de 50, violeta la de 200.
+        listOfNotNull(ma50?.let { it to ma50Color }, ma200?.let { it to ma200Color }).forEach { (series, c) ->
+            val path = Path()
+            var started = false
+            series.forEachIndexed { i, v ->
+                if (v == null) return@forEachIndexed
+                if (!started) path.moveTo(x(i), y(v)) else path.lineTo(x(i), y(v))
+                started = true
+            }
+            drawPath(path, c, style = Stroke(width = stroke * 0.8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
         if (base != null) {
             drawLine(dash, Offset(0f, by), Offset(plotRight, by), strokeWidth = 1.dp.toPx(),

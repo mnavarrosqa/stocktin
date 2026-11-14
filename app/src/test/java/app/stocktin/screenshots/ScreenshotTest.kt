@@ -182,6 +182,19 @@ class ScreenshotTest {
     }
 
     @Test
+    fun candles() {
+        launch()
+        openSymbol("NVDA")
+        settle()
+        compose.onNodeWithText("6M").performClick()
+        settle()
+        compose.onNodeWithText("Velas").performClick()
+        compose.onNodeWithText("Medias 50/200").performClick()
+        settle()
+        shot("04e_detalle_velas")
+    }
+
+    @Test
     fun compare() {
         launch()
         openSymbol("NVDA")

@@ -60,6 +60,11 @@ data class Chart(
     val prices: List<Double>,
     val previousClose: Double?,
     val meta: ChartMeta,
+    /** Apertura, máximo y mínimo de cada vela y su volumen, alineados con [prices] (vacíos si no vinieron). */
+    val opens: List<Double> = emptyList(),
+    val highs: List<Double> = emptyList(),
+    val lows: List<Double> = emptyList(),
+    val volumes: List<Long> = emptyList(),
 )
 
 /** Lo que trae el endpoint de gráficos además de los precios. */

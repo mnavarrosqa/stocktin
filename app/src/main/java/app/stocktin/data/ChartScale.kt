@@ -71,4 +71,15 @@ object ChartScale {
             i to format.format(t).replace(".", "").replaceFirstChar { it.uppercase() }
         }
     }
+
+    /** Media móvil simple de [period] valores; null mientras no hay suficientes. */
+    fun sma(values: List<Double>, period: Int): List<Double?> {
+        if (period <= 0) return values.map { null }
+        var sum = 0.0
+        return values.mapIndexed { i, v ->
+            sum += v
+            if (i >= period) sum -= values[i - period]
+            if (i >= period - 1) sum / period else null
+        }
+    }
 }
