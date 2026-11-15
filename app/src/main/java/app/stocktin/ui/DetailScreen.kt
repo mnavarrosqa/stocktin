@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import app.stocktin.data.Cedears
 import app.stocktin.data.Chart
 import app.stocktin.data.ChartCompare
+import app.stocktin.data.aroundTheClock
 import app.stocktin.data.CompanyInfo
 import app.stocktin.data.ChartRange
 import app.stocktin.data.ExtSegment
@@ -205,13 +206,15 @@ fun DetailScreen(viewModel: MainViewModel, symbol: String, inPane: Boolean = fal
         val chart = state?.chart
         val prices = chart?.prices.orEmpty()
         val range = state?.range ?: ChartRange.DAY
-        val baseline = if (range == ChartRange.DAY) quote.previousClose ?: chart?.previousClose else prices.firstOrNull()
+        // En las cripto, el 1D son las últimas 24 horas: se compara contra su comienzo.
+        val baseline = if (range == ChartRange.DAY && chart?.aroundTheClock != true) quote.previousClose ?: chart?.previousClose else prices.firstOrNull()
         val benchmark = ChartCompare.benchmarkFor(symbol)
         val (before, after) = state?.extended?.takeIf { range == ChartRange.DAY }
             ?.let { extended -> chart?.let { ExtendedHours.split(it, extended) } } ?: (null to null)
         val start = baseline ?: prices.firstOrNull()
         val overlay = if (comparing && chart != null && start != null) {
             state?.benchmark?.let { other -> ChartCompare.overlay(chart, start, other, if (range == ChartRange.DAY) other.previousClose else null) }
+                ?.takeIf { it.isNotEmpty() }
         } else {
             null
         }

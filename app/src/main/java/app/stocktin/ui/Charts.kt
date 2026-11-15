@@ -74,7 +74,8 @@ fun PriceChart(
 ) {
     val dash = MaterialColors.outline()
     val ohlc = candles && opens.size == prices.size && highs.size == prices.size && lows.size == prices.size
-    val showVolume = volumes.size == prices.size && volumes.any { it > 0 }
+    // Con pocos puntos las barras quedan enormes y no dicen nada.
+    val showVolume = volumes.size == prices.size && prices.size >= 12 && volumes.any { it > 0 }
     val ma50 = remember(prices, averages) { if (averages && prices.size >= 50) ChartScale.sma(prices, 50) else null }
     val ma200 = remember(prices, averages) { if (averages && prices.size >= 200) ChartScale.sma(prices, 200) else null }
     val ma50Color = Color(0xFFE0A100)

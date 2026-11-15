@@ -61,7 +61,16 @@ object YahooApi {
     }
 
     suspend fun chart(symbol: String, range: ChartRange): Chart = withContext(Dispatchers.IO) {
-        chart(symbol, range.range, range.interval, prePost = false)
+        val chart = chart(symbol, range.range, range.interval, prePost = false)
+        if (range == ChartRange.DAY && chart.aroundTheClock) {
+            // Para las cripto, el día de Yahoo arranca a la medianoche UTC (las 21 en Argentina) y a
+            // esa hora el gráfico quedaba con dos o tres puntos: se muestran las últimas 24 horas.
+            val twoDays = chart(symbol, "2d", range.interval, prePost = false)
+            val end = twoDays.timestamps.lastOrNull() ?: return@withContext chart
+            twoDays.since(end - 24 * 3600)
+        } else {
+            chart
+        }
     }
 
     /** El gráfico del día con pre-apertura y post-cierre. */

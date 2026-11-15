@@ -17,6 +17,8 @@ object ChartCompare {
      */
     fun overlay(base: Chart, baseStart: Double, other: Chart, otherStart: Double?): List<Double> {
         if (base.prices.isEmpty() || other.prices.isEmpty()) return emptyList()
+        // Si el índice no operó en ese lapso (por ejemplo, un fin de semana), no hay nada que comparar.
+        if (other.timestamps.last() < base.timestamps.first()) return emptyList()
         var j = 0
         val aligned = base.timestamps.map { t ->
             while (j + 1 < other.timestamps.size && other.timestamps[j + 1] <= t) j++

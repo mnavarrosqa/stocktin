@@ -35,4 +35,21 @@ class ChartCompareTest {
         assertEquals(99.0 * 4950 / 5000, overlay[0], 1e-9)
         assertEquals(2.0, ChartCompare.percent(overlay, 99.0)!!, 1e-9)
     }
+
+    @Test
+    fun `sin horarios en comun no hay comparacion`() {
+        val base = chart(listOf(100, 200), listOf(10.0, 11.0))
+        val other = chart(listOf(10, 20), listOf(50.0, 51.0))
+        assertEquals(emptyList<Double>(), ChartCompare.overlay(base, 10.0, other, null))
+    }
+
+    @Test
+    fun `since recorta precios y volumen`() {
+        val c = chart(listOf(10, 20, 30, 40), listOf(1.0, 2.0, 3.0, 4.0)).copy(volumes = listOf(5, 6, 7, 8))
+        val cut = c.since(25)
+        assertEquals(listOf(30L, 40L), cut.timestamps)
+        assertEquals(listOf(3.0, 4.0), cut.prices)
+        assertEquals(listOf(7L, 8L), cut.volumes)
+        assertEquals(c, c.since(0))
+    }
 }

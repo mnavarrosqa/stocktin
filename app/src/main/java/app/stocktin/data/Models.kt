@@ -67,6 +67,24 @@ data class Chart(
     val volumes: List<Long> = emptyList(),
 )
 
+/** Las cripto operan las 24 horas: su "día" en Yahoo empieza a la medianoche UTC. */
+val Chart.aroundTheClock: Boolean get() = meta.quoteType == "CRYPTOCURRENCY"
+
+/** Solo los puntos desde [start] (segundos desde 1970), con sus velas y volumen. */
+fun Chart.since(start: Long): Chart {
+    val from = timestamps.indexOfFirst { it >= start }.let { if (it < 0) timestamps.size else it }
+    if (from == 0) return this
+    fun <T> List<T>.cut() = if (size == timestamps.size) drop(from) else this
+    return copy(
+        timestamps = timestamps.drop(from),
+        prices = prices.drop(from),
+        opens = opens.cut(),
+        highs = highs.cut(),
+        lows = lows.cut(),
+        volumes = volumes.cut(),
+    )
+}
+
 /** Lo que trae el endpoint de gráficos además de los precios. */
 data class ChartMeta(
     val symbol: String,
