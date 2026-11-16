@@ -109,9 +109,11 @@ class PortfolioWidget : GlanceAppWidget() {
                 .background(p.background)
                 .padding(horizontal = padding, vertical = if (size.height < 110.dp) 10.dp else 14.dp)
                 .clickable(actionStartActivity<MainActivity>()),
+            verticalAlignment = if (size.height < 100.dp) Alignment.CenterVertically else Alignment.Top,
         ) {
             val main = totals.firstOrNull()
-            Header(p, updated.takeIf { size.width >= 200.dp && main != null })
+            // Bajito (2×1) no entra el título: queda el total y el cambio del día.
+            if (size.height >= 100.dp || main == null) Header(p, updated.takeIf { size.width >= 200.dp && main != null })
             if (main == null) {
                 Spacer(GlanceModifier.defaultWeight())
                 Text(
