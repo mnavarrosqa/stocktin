@@ -26,6 +26,8 @@ import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
+import androidx.glance.currentState
+import androidx.datastore.preferences.core.Preferences
 import androidx.glance.color.ColorProvider as DayNight
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -70,6 +72,7 @@ class PortfolioWidget : GlanceAppWidget() {
         val hidden = Settings(context).hideBalance
         provideContent {
             GlanceTheme {
+                val prefs = currentState<Preferences>()
                 val quotes by repository.quotes.collectAsState()
                 val holdings by repository.holdings.collectAsState()
                 val history by repository.history.collectAsState()
@@ -77,7 +80,7 @@ class PortfolioWidget : GlanceAppWidget() {
                 Content(
                     holdings = holdings.values,
                     quotes = quotes,
-                    p = WidgetPalette.of(WidgetTheme.DYNAMIC),
+                    p = WidgetPalette.of(WidgetTheme.from(prefs[WidgetKeys.THEME])),
                     hidden = hidden,
                     history = history,
                     updated = lastRefresh.takeIf { it > 0 }?.let { Format.time(it) },

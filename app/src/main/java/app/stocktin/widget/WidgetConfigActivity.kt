@@ -56,8 +56,10 @@ class WidgetConfigActivity : ComponentActivity() {
         }
         // Si se sale sin guardar, el widget no se agrega.
         setResult(RESULT_CANCELED, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
-        val ticker = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)
-            ?.provider?.className == TickerWidgetReceiver::class.java.name
+        val provider = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)?.provider?.className
+        val ticker = provider == TickerWidgetReceiver::class.java.name
+        // El de cartera solo elige el aspecto.
+        val portfolio = provider == PortfolioWidgetReceiver::class.java.name
 
         lifecycleScope.launch {
             val glanceId = GlanceAppWidgetManager(this@WidgetConfigActivity).getGlanceIdBy(appWidgetId)
@@ -65,7 +67,7 @@ class WidgetConfigActivity : ComponentActivity() {
             setContent {
                 val settings = Settings(this@WidgetConfigActivity)
                 StocktinTheme(settings.themeMode, settings.dynamicColor) {
-                    ConfigScreen(ticker, prefs) { save ->
+                    ConfigScreen(ticker, portfolio, prefs) { save ->
                         lifecycleScope.launch {
                             updateAppWidgetState(this@WidgetConfigActivity, glanceId) { save(it) }
                             Widgets.updateAll(this@WidgetConfigActivity)
@@ -84,6 +86,7 @@ class WidgetConfigActivity : ComponentActivity() {
     @Composable
     private fun ConfigScreen(
         ticker: Boolean,
+        portfolio: Boolean,
         initial: Preferences,
         onSave: ((androidx.datastore.preferences.core.MutablePreferences) -> Unit) -> Unit,
     ) {
@@ -99,7 +102,13 @@ class WidgetConfigActivity : ComponentActivity() {
         var ext by remember { mutableStateOf(initial[WidgetKeys.SHOW_EXT] ?: true) }
         var value by remember { mutableStateOf(initial[WidgetKeys.SHOW_VALUE] ?: false) }
 
-        Scaffold(topBar = { TopAppBar(title = { Text(if (ticker) "Widget de un símbolo" else "Widget de lista") }) }) { padding ->
+        Scaffold(topBar = { TopAppBar(title = { Text(
+                    when {
+                        portfolio -> "Widget de cartera"
+                        ticker -> "Widget de un símbolo"
+                        else -> "Widget de lista"
+                    },
+                ) }) }) { padding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -108,7 +117,9 @@ class WidgetConfigActivity : ComponentActivity() {
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (ticker) {
+                if (portfolio) {
+                    // Nada que elegir más que el aspecto.
+                } else if (ticker) {
                     Section("Símbolo")
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         (repository.allSymbols() + app.stocktin.data.MARKET_SYMBOLS).distinct().forEach { s ->
@@ -123,7 +134,7 @@ class WidgetConfigActivity : ComponentActivity() {
                         }
                     }
                 }
-                if (!ticker) {
+                if (!ticker && !portfolio) {
                     Section("Diseño")
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         WidgetLayout.entries.forEach { l ->
@@ -146,16 +157,16 @@ class WidgetConfigActivity : ComponentActivity() {
                         FilterChip(selected = t == theme, onClick = { theme = t }, label = { Text(t.label) })
                     }
                 }
-                val list = !ticker && layout == WidgetLayout.LIST
+                val list = !ticker && !portfolio && layout == WidgetLayout.LIST
                 if (list) {
                     Toggle("Minigráfico del día", "Se ve si el widget es bastante ancho", spark) { spark = it }
                     Toggle("Nombre de cada símbolo", null, name) { name = it }
                     Toggle("Pre-apertura y post-cierre", "El precio fuera de horario, debajo del cambio", ext) { ext = it }
                 }
-                if (ticker || list) {
+                if ((ticker || list) && !portfolio) {
                     Toggle("Cambio en etiqueta de color", "Como en la app Bolsa del iPhone", pill) { pill = it }
                 }
-                Toggle("Cambio en dinero", "En vez de porcentaje", value) { value = it }
+                if (!portfolio) Toggle("Cambio en dinero", "En vez de porcentaje", value) { value = it }
                 Button(
                     onClick = {
                         onSave { prefs ->

@@ -169,6 +169,8 @@ class WidgetScreenshotTest {
 
     @Test fun portfolio4x3() = render("17_cartera_4x3", 340.dp, 300.dp) { PortfolioWidgetOf() }
 
+    @Test fun portfolioDark() = render("18_cartera_4x2_oscuro", 300.dp, 200.dp) { PortfolioWidgetOf(theme = WidgetTheme.DARK) }
+
     @Test fun portfolioHidden() = render("16_cartera_oculta", 250.dp, 120.dp) { PortfolioWidgetOf(hidden = true) }
 
     @Test fun ticker2x2Dark() = render("13_simbolo_2x2_oscuro", 160.dp, 180.dp) { TickerWidgetOf("NVDA", WidgetTheme.DARK) }
