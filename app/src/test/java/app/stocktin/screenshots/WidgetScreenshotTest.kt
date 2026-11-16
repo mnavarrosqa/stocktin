@@ -152,14 +152,22 @@ class WidgetScreenshotTest {
 
     private val holdings = listOf(Holding("NVDA", 12.0, 160.0), Holding("AAPL", 5.0, 245.0), Holding("MELI", 1.0, 1900.0))
 
+    /** Un mes de historia de la cartera, para el minigráfico. */
+    private val history = (0 until 30).associate { i ->
+        java.time.LocalDate.of(2026, 10, 1).plusDays(i.toLong()).toString() to
+            mapOf("USD" to 5600.0 + i * 32 + (if (i % 4 == 0) -90.0 else 40.0))
+    }
+
     @Composable
-    private fun PortfolioWidgetOf(hidden: Boolean = false) {
-        PortfolioWidget().Content(holdings, rows.toMap(), WidgetPalette.of(WidgetTheme.DYNAMIC), hidden)
+    private fun PortfolioWidgetOf(hidden: Boolean = false, theme: WidgetTheme = WidgetTheme.DYNAMIC) {
+        PortfolioWidget().Content(holdings, rows.toMap(), WidgetPalette.of(theme), hidden, history, updated = "14:22")
     }
 
     @Test fun portfolio2x1() = render("14_cartera_2x1", 160.dp, 90.dp) { PortfolioWidgetOf() }
 
     @Test fun portfolio4x2() = render("15_cartera_4x2", 340.dp, 200.dp) { PortfolioWidgetOf() }
+
+    @Test fun portfolio4x3() = render("17_cartera_4x3", 340.dp, 300.dp) { PortfolioWidgetOf() }
 
     @Test fun portfolioHidden() = render("16_cartera_oculta", 250.dp, 120.dp) { PortfolioWidgetOf(hidden = true) }
 

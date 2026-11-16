@@ -53,6 +53,9 @@ class WidgetPalette(
     val upPill: ColorProvider,
     val downPill: ColorProvider,
     val onPill: ColorProvider,
+    /** Fondo suave para las pastillas de cambio en verde o rojo (como en la app). */
+    val upTint: ColorProvider = ColorProvider(Color(UP).copy(alpha = 0.16f)),
+    val downTint: ColorProvider = ColorProvider(Color(DOWN).copy(alpha = 0.16f)),
 ) {
     companion object {
         // Mismos colores en la app y en el minigráfico del widget.
@@ -85,6 +88,8 @@ class WidgetPalette(
                     upPill = DayNight(Color(0xFF16A34A), Color(0xFF1F9D55)),
                     downPill = DayNight(Color(0xFFE5484D), Color(0xFFD9363E)),
                     onPill = ColorProvider(Color.White),
+                    upTint = DayNight(light.up.copy(alpha = 0.13f), dark.up.copy(alpha = 0.18f)),
+                    downTint = DayNight(light.down.copy(alpha = 0.12f), dark.down.copy(alpha = 0.18f)),
                 )
             }
             WidgetTheme.SYSTEM -> WidgetPalette(
@@ -97,6 +102,8 @@ class WidgetPalette(
                 upPill = DayNight(Color(0xFF16A34A), Color(0xFF1F9D55)),
                 downPill = DayNight(Color(0xFFE5484D), Color(0xFFD9363E)),
                 onPill = ColorProvider(Color.White),
+                upTint = DayNight(light.up.copy(alpha = 0.13f), dark.up.copy(alpha = 0.18f)),
+                downTint = DayNight(light.down.copy(alpha = 0.12f), dark.down.copy(alpha = 0.18f)),
             )
             WidgetTheme.LIGHT -> light.palette()
             WidgetTheme.DARK -> dark.palette()
@@ -123,6 +130,8 @@ class WidgetPalette(
             upPill = ColorProvider(Color(0xFF16A34A)),
             downPill = ColorProvider(Color(0xFFE5484D)),
             onPill = ColorProvider(Color.White),
+            upTint = ColorProvider(up.copy(alpha = 0.16f)),
+            downTint = ColorProvider(down.copy(alpha = 0.16f)),
         )
     }
 }
